@@ -1,0 +1,15 @@
+*.raw
+*.bin
+*.zip
+*.mbn
+*.tgz
+build
+dist
+/files
+/mnt
+/rootfs
+# 注意: scripts/rootfs/ 是脚本子目录, 不能被 rootfs 规则误伤
+
+!firmware/**
+!scripts/**
+
