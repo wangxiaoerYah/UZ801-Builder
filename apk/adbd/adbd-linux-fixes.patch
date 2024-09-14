@@ -1,0 +1,319 @@
+diff --git a/adb/Makefile b/adb/Makefile
+index f446b1b..982b561 100644
+--- a/adb/Makefile
++++ b/adb/Makefile
+@@ -81,8 +81,8 @@ CFLAGS= $(OPT_CFLAGS) $(LOCAL_CFLAGS) $(LOCAL_INCLUDES)
+ all: $(LOCAL_MODULE) xdg-adbd
+ 
+ $(LOCAL_MODULE): $(OBJS)
+-	${CXX} -fPIC $(CXXFLAGS) $^ -L ../libcutils/*.o ../base/*.o ../libcrypto_utils/*.o -lpthread -lresolv -lcrypto -lssl -lutil -o $@
+-	#g++ -fPIC $(CXXFLAGS) $^ -L ../libcutils/*.o ../base/*.o ../libcrypto_utils/*.o -lpthread -lresolv -lcrypto -lssl -lutil -o $@
++	${CXX} -fPIC $(CXXFLAGS) $^ -L ../libcutils/*.o ../base/*.o ../libcrypto_utils/*.o -lpthread -lresolv -lcrypto -lssl -lutil $(LDFLAGS) -o $@
++	#g++ -fPIC $(CXXFLAGS) $^ -L ../libcutils/*.o ../base/*.o ../libcrypto_utils/*.o -lpthread -lresolv -lcrypto -lssl -lutil $(LDFLAGS) -o $@
+ 
+ xdg-adbd: xdg-adbd.c
+ 	${CC} -o $@ $< $(CFLAGS) $(LFLAGS) `pkg-config --libs --cflags glib-2.0`
+diff --git a/adb/adb_auth_client.cpp b/adb/adb_auth_client.cpp
+index 415ab8e..9126701 100644
+--- a/adb/adb_auth_client.cpp
++++ b/adb/adb_auth_client.cpp
+@@ -25,6 +25,7 @@
+ 
+ #include <openssl/obj_mac.h>
+ #include <openssl/rsa.h>
++#include <openssl/evp.h>
+ #include <openssl/sha.h>
+ 
+ #include <crypto_utils/android_pubkey.h>
+@@ -81,10 +82,9 @@ static void read_keys(const char *file, struct listnode *list)
+         if (sep)
+             *sep = '\0';
+ 
+-        // b64_pton requires one additional byte in the target buffer for
+-        // decoding to succeed. See http://b/28035006 for details.
++        // OpenSSL 3.x 移除了内部 __b64_pton, 用 EVP_DecodeBlock
+         uint8_t keybuf[ANDROID_PUBKEY_ENCODED_SIZE + 1];
+-        ret = __b64_pton(buf, keybuf, sizeof(keybuf));
++        ret = EVP_DecodeBlock(keybuf, (const unsigned char*)buf, strlen(buf));
+         if (ret != ANDROID_PUBKEY_ENCODED_SIZE) {
+             D("%s: Invalid base64 data ret=%d", file, ret);
+             free(key);
+diff --git a/adb/diagnose_usb.cpp b/adb/diagnose_usb.cpp
+index 0f067b0..75cddad 100644
+--- a/adb/diagnose_usb.cpp
++++ b/adb/diagnose_usb.cpp
+@@ -16,6 +16,26 @@
+ 
+ #include "diagnose_usb.h"
+ 
++
++/* musl 无 group_member(3), 提供兼容实现 */
++#if !defined(__GLIBC__) && !defined(__ANDROID__)
++#include <unistd.h>
++#include <grp.h>
++static int group_member(gid_t gid) {
++    int n = getgroups(0, NULL);
++    if (n <= 0) return 0;
++    gid_t* groups = (gid_t*)malloc(sizeof(gid_t) * n);
++    if (!groups) return 0;
++    n = getgroups(n, groups);
++    int found = 0;
++    for (int i = 0; i < n; i++) {
++        if (groups[i] == gid) { found = 1; break; }
++    }
++    free(groups);
++    return found;
++}
++#endif
++
+ #include <errno.h>
+ #include <unistd.h>
+ 
+diff --git a/adb/services.cpp b/adb/services.cpp
+index 8496dcd..00dfec7 100644
+--- a/adb/services.cpp
++++ b/adb/services.cpp
+@@ -36,6 +36,7 @@
+ #include <android-base/stringprintf.h>
+ #include <android-base/strings.h>
+ #include <cutils/sockets.h>
++#include <cutils/properties.h>
+ 
+ #if !ADB_HOST
+ #include "cutils/android_reboot.h"
+diff --git a/adb/usb_linux_client.cpp b/adb/usb_linux_client.cpp
+index c053007..3e2ac34 100644
+--- a/adb/usb_linux_client.cpp
++++ b/adb/usb_linux_client.cpp
+@@ -229,7 +229,7 @@ static void init_os_desc_header(void)
+ {
+     os_desc_header.interface = cpu_to_le32(1);
+     os_desc_header.dwLength = cpu_to_le32(sizeof(os_desc_header) + sizeof(os_desc_compat));
+-    os_desc_header.bcdVersion = cpu_to_le32(1);
++    os_desc_header.bcdVersion = cpu_to_le32(0x0100);  /* 内核要求 0x0100, 0x0001 被 Windows 拒绝 */
+     os_desc_header.wIndex = cpu_to_le32(4);
+     os_desc_header.bCount = cpu_to_le32(1);
+     os_desc_header.Reserved = cpu_to_le32(0);
+@@ -243,6 +243,9 @@ static void init_structs(void)
+     init_os_desc_header();
+ }
+ 
++/* usb_ffs_open_thread 定义在 usb_init 之后, 需要前向声明 */
++static void usb_ffs_open_thread(void* x);
++
+ static void usb_adb_open_thread(void* x) {
+     struct usb_handle *usb = (struct usb_handle *)x;
+     int fd;
+@@ -377,7 +380,9 @@ static void usb_adb_init()
+     }
+ 
+     D("[ usb_init - starting thread ]");
+-    if (!adb_thread_create(usb_adb_open_thread, h)) {
++    // Linux 内核无 /dev/android_adb, 必须用 functionfs 线程
++    // (usb_ffs_open_thread 打开 /dev/usb-ffs/adb/ep0 并写描述符)
++    if (!adb_thread_create(usb_ffs_open_thread, h)) {
+         fatal_errno("cannot create usb thread");
+     }
+ }
+diff --git a/base/file.cpp b/base/file.cpp
+index ed994b3..b93c342 100644
+--- a/base/file.cpp
++++ b/base/file.cpp
+@@ -112,7 +112,7 @@ bool WriteStringToFile(const std::string& content, const std::string& path,
+ 
+ bool WriteStringToFile(const std::string& content, const std::string& path) {
+   int flags = O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW | O_BINARY;
+-  int fd = TEMP_FAILURE_RETRY(open(path.c_str(), flags, DEFFILEMODE));
++  int fd = TEMP_FAILURE_RETRY(open(path.c_str(), flags, (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)));
+   if (fd == -1) {
+     return false;
+   }
+diff --git a/base/logging.cpp b/base/logging.cpp
+index 8854f19..8ac92c4 100644
+--- a/base/logging.cpp
++++ b/base/logging.cpp
+@@ -1,3 +1,6 @@
++#if !defined(_GNU_SOURCE)
++#define _GNU_SOURCE 1
++#endif
+ /*
+  * Copyright (C) 2015 The Android Open Source Project
+  *
+@@ -24,10 +27,11 @@
+ #include <libgen.h>
+ #include <time.h>
+ 
+-// For getprogname(3) or program_invocation_short_name.
++// musl 无 getprogname(3), 用 program_invocation_short_name (GNU 扩展, errno.h)
+ #if defined(__ANDROID__) || defined(__APPLE__)
+ #include <stdlib.h>
+-#elif defined(__GLIBC__)
++#include <errno.h>
++#else
+ #include <errno.h>
+ #endif
+ 
+@@ -180,7 +184,7 @@ LogSeverity GetMinimumLogSeverity() {
+ 
+ static const char* ProgramInvocationName() {
+   if (gProgramInvocationName == nullptr) {
+-    gProgramInvocationName.reset(new std::string(getprogname()));
++    gProgramInvocationName.reset(new std::string(program_invocation_short_name));
+   }
+ 
+   return gProgramInvocationName->c_str();
+diff --git a/include/cutils/android_reboot.h b/include/cutils/android_reboot.h
+index a3861a0..4e0ea2e 100644
+--- a/include/cutils/android_reboot.h
++++ b/include/cutils/android_reboot.h
+@@ -19,6 +19,16 @@
+ 
+ #include <mntent.h>
+ 
++/* musl/Linux 无 AOSP 的 __BEGIN_DECLS, 在此定义 */
++#ifndef __BEGIN_DECLS
++#ifdef __cplusplus
++#define __BEGIN_DECLS extern "C" {
++#define __END_DECLS }
++#else
++#define __BEGIN_DECLS
++#define __END_DECLS
++#endif
++#endif
+ __BEGIN_DECLS
+ 
+ /* Commands */
+diff --git a/libcrypto_utils/android_pubkey.c b/libcrypto_utils/android_pubkey.c
+index cdad40c..2f59949 100644
+--- a/libcrypto_utils/android_pubkey.c
++++ b/libcrypto_utils/android_pubkey.c
+@@ -21,6 +21,7 @@
+ #include <string.h>
+ 
+ #include <openssl/bn.h>
++#include <openssl/opensslv.h>
+ 
+ // Better safe than sorry.
+ #if (ANDROID_PUBKEY_MODULUS_SIZE % 4) != 0
+@@ -82,16 +83,16 @@ bool android_pubkey_decode(const uint8_t* key_buffer, size_t size, RSA** key) {
+   // Convert the modulus to big-endian byte order as expected by BN_bin2bn.
+   memcpy(modulus_buffer, key_struct->modulus, sizeof(modulus_buffer));
+   reverse_bytes(modulus_buffer, sizeof(modulus_buffer));
+-  new_key->n = BN_bin2bn(modulus_buffer, sizeof(modulus_buffer), NULL);
+-  if (!new_key->n) {
++  // OpenSSL 3.x: RSA/BIGNUM 不透明结构, 用设置器 API
++  BIGNUM* n = BN_bin2bn(modulus_buffer, sizeof(modulus_buffer), NULL);
++  BIGNUM* e = BN_new();
++  if (!n || !e || !BN_set_word(e, key_struct->exponent)) {
+     goto cleanup;
+   }
+-
+-  // Read the exponent.
+-  new_key->e = BN_new();
+-  if (!new_key->e || !BN_set_word(new_key->e, key_struct->exponent)) {
++  if (!RSA_set0_key(new_key, n, e, NULL)) {
+     goto cleanup;
+   }
++  n = e = NULL;  // 所有权已转移
+ 
+   // Note that we don't extract the montgomery parameters n0inv and rr from
+   // the RSAPublicKey structure. They assume a word size of 32 bits, but
+@@ -134,51 +135,12 @@ static int constant_time_le_size_t(size_t x, size_t y) {
+  * |in|, however it necessarily does not have the same memory access pattern. If
+  * the access would be out of bounds, it reads the last word of |in|. |in| must
+  * not be zero. */
+-static BN_ULONG read_word_padded(const BIGNUM *in, size_t i) {
+-  /* Read |in->d[i]| if valid. Otherwise, read the last word. */
+-  BN_ULONG l = in->d[constant_time_select_ulong(
+-      constant_time_le_size_t(in->dmax, i), in->dmax - 1, i)];
+-
+-  /* Clamp to zero if above |d->top|. */
+-  return constant_time_select_ulong(constant_time_le_size_t(in->top, i), 0, l);
+-}
+-
+-int BN_bn2bin_padded(uint8_t *out, size_t len, const BIGNUM *in) {
+-  size_t i;
+-  BN_ULONG l;
+-
+-  /* Special case for |in| = 0. Just branch as the probability is negligible. */
+-  if (BN_is_zero(in)) {
+-    memset(out, 0, len);
+-    return 1;
+-  }
+-
+-  /* Check if the integer is too big. This case can exit early in non-constant
+-   * time. */
+-  if (in->top > (len + (BN_BYTES - 1)) / BN_BYTES) {
+-    return 0;
+-  }
+-  if ((len % BN_BYTES) != 0) {
+-    l = read_word_padded(in, len / BN_BYTES);
+-    if (l >> (8 * (len % BN_BYTES)) != 0) {
+-      return 0;
+-    }
+-  }
+-
+-  /* Write the bytes out one by one. Serialization is done without branching on
+-   * the bits of |in| or on |in->top|, but if the routine would otherwise read
+-   * out of bounds, the memory access pattern can't be fixed. However, for an
+-   * RSA key of size a multiple of the word size, the probability of BN_BYTES
+-   * leading zero octets is low.
+-   *
+-   * See Falko Stenzke, "Manger's Attack revisited", ICICS 2010. */
+-  i = len;
+-  while (i--) {
+-    l = read_word_padded(in, i / BN_BYTES);
+-    *(out++) = (uint8_t)(l >> (8 * (i % BN_BYTES))) & 0xff;
+-  }
+-  return 1;
++/* OpenSSL 1.1: BN_bn2bin_padded; 3.x 改名为 BN_bn2binpad (参数顺序不同) */
++#if OPENSSL_VERSION_NUMBER >= 0x30000000L
++static int BN_bn2bin_padded(uint8_t* out, size_t len, const BIGNUM* in) {
++    return BN_bn2binpad(in, out, (int)len);
+ }
++#endif
+ 
+ #endif
+ 
+@@ -198,6 +160,10 @@ bool android_pubkey_encode(const RSA* key, uint8_t* key_buffer, size_t size) {
+   BIGNUM* r32 = BN_new();
+   BIGNUM* n0inv = BN_new();
+   BIGNUM* rr = BN_new();
++  // OpenSSL 3.x 不透明结构: 用访问器获取组件
++  const BIGNUM* n = NULL;
++  const BIGNUM* e = NULL;
++  RSA_get0_key(key, &n, &e, NULL);
+ 
+   if (sizeof(RSAPublicKey) > size ||
+       RSA_size(key) != ANDROID_PUBKEY_MODULUS_SIZE) {
+@@ -209,26 +175,26 @@ bool android_pubkey_encode(const RSA* key, uint8_t* key_buffer, size_t size) {
+ 
+   // Compute and store n0inv = -1 / N[0] mod 2^32.
+   if (!ctx || !r32 || !n0inv || !BN_set_bit(r32, 32) ||
+-      !BN_mod(n0inv, key->n, r32, ctx) ||
++      !BN_mod(n0inv, n, r32, ctx) ||
+       !BN_mod_inverse(n0inv, n0inv, r32, ctx) || !BN_sub(n0inv, r32, n0inv)) {
+     goto cleanup;
+   }
+   key_struct->n0inv = (uint32_t)BN_get_word(n0inv);
+ 
+   // Store the modulus.
+-  if (!android_pubkey_encode_bignum(key->n, key_struct->modulus)) {
++  if (!android_pubkey_encode_bignum(n, key_struct->modulus)) {
+     goto cleanup;
+   }
+ 
+   // Compute and store rr = (2^(rsa_size)) ^ 2 mod N.
+   if (!ctx || !rr || !BN_set_bit(rr, ANDROID_PUBKEY_MODULUS_SIZE * 8) ||
+-      !BN_mod_sqr(rr, rr, key->n, ctx) ||
++      !BN_mod_sqr(rr, rr, n, ctx) ||
+       !android_pubkey_encode_bignum(rr, key_struct->rr)) {
+     goto cleanup;
+   }
+ 
+   // Store the exponent.
+-  key_struct->exponent = (uint32_t)BN_get_word(key->e);
++  key_struct->exponent = (uint32_t)BN_get_word(e);
+ 
+   ret = true;
+ 

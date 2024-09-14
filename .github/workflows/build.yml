@@ -1,0 +1,114 @@
+name: Build postmarketOS image
+
+on:
+  workflow_dispatch:
+    inputs:
+      board:
+        description: "Target Board (yiming-uz801v3 / thwc-uf896 / thwc-ufi001c / jz01-45-v33 / fy-mf800)"
+        required: true
+        default: "yiming-uz801v3"
+        type: string
+      release:
+        description: "postmarketOS release (v26.06)"
+        required: true
+        default: "v26.06"
+        type: string
+
+env:
+  BOARD: ${{ inputs.board || 'yiming-uz801v3' }}
+  RELEASE_INPUT: ${{ inputs.release || 'v26.06' }}
+
+jobs:
+  # 独立 APK 构建 workflow (手动可触发, 也被本 workflow 调用)
+  # 产出: 所有 apk/ 下包的 .apk (artifact: pmos-apks)
+  build-packages:
+    uses: ./.github/workflows/build-packages.yml
+
+  build:
+    needs: build-packages
+    runs-on: ubuntu-24.04-arm   # 原生 ARM64, 无需 QEMU 交叉模拟
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      # 下载 build-packages 构建的 APK (如 adbd), 供 rootfs 安装
+      - uses: actions/download-artifact@v7
+        with:
+          name: pmos-apks
+          path: apk-artifacts
+          # 若该 workflow 未产出 apk (如手动单独跑 build), 不阻塞
+          # 由于 build-packages 是硬依赖, 正常情况下必有产物
+        continue-on-error: true
+
+      - name: Install dependencies
+        run: sudo sh -e scripts/install_deps.sh
+
+      - name: Build hyp and aboot firmware
+        run: sudo env BOARD=${BOARD} sh -e scripts/build_hyp_aboot.sh
+
+      - name: Extract MSM8916 firmware (GPT + bootloader)
+        run: sudo sh -e scripts/extract_fw.sh
+
+      - name: Create postmarketOS rootfs
+        run: sudo env BOARD=${BOARD} RELEASE_INPUT=${RELEASE_INPUT} CUSTOM_APK_DIR=${CUSTOM_APK_DIR:-} sh -e scripts/pmos_rootfs.sh
+        env:
+          CUSTOM_APK_DIR: ${{ github.workspace }}/apk-artifacts
+
+      - name: Create images
+        run: sudo sh -e scripts/build_images.sh
+
+      - name: Copy custom firmware partitions
+        run: sudo env BOARD=${BOARD} sh -e scripts/copy_custom_fw.sh
+
+      - name: Generate Release Tag & Name
+        id: vars
+        run: |
+          export TZ="Asia/Shanghai"
+          TAG="${BOARD}-pmos-v$(date +'%Y%m%d-%H%M')"
+          echo "tag_name=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "release_name=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifacts
+        id: artifact_upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: openstick-pmos-${{ env.BOARD }}
+          path: files/*
+
+      - name: Generate Release Notes
+        run: |
+          cat << 'EOF' > release_body.md
+          ## OpenStick postmarketOS 固件发布 🚀
+
+          - **适配机型 (Board)**: `${{ env.BOARD }}`
+          - **postmarketOS 版本**: `${{ env.RELEASE_INPUT }}`
+          - **提交哈希 (Commit)**: `${{ github.sha }}`
+          - **触发事件**: `${{ github.event_name }}`
+
+          ### 特性
+          - 基于 **postmarketOS** (aarch64), 内核 `linux-postmarketos-qcom-msm8916`
+          - 无 GUI, 纯 headless (串口 ttyMSM0 控制台)
+          - 设备端可直接 `apk update && apk upgrade` 自行升级内核与系统
+          - btrfs (@ + @var_lib subvolume, zstd 压缩) + zram swap
+          - USB gadget (rndis 网卡), WiFi 客户端 (iwd), 4G LTE 上网 (ModemManager)
+
+          ### 📦 产物
+          * 🔗 [Artifact 下载](${{ steps.artifact_upload.outputs.artifact-url }})
+          * 🔍 [Actions 运行详情](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          > ⚠️ 刷机有变砖风险, 请先备份原固件!
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.vars.outputs.tag_name }}
+          name: ${{ steps.vars.outputs.release_name }}
+          body_path: release_body.md
+          draft: false
+          prerelease: false

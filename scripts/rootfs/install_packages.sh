@@ -1,0 +1,116 @@
+#!/bin/sh -e
+# =============================================================================
+# rootfs 子模块: 安装 postmarketOS 基础包 + 自定义 dtb
+# =============================================================================
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "${HERE}/../lib/common.sh"
+
+log "Installing postmarketOS base packages (${INPUT_RELEASE})..."
+
+# 自定义 APK 安装已注释 (2026-09-01): 设备端已卸载 adbd, 镜像不再打包
+# 需要时取消注释: build-packages 产物 (CUSTOM_APK_DIR) 复制到 chroot /tmp
+# 宿主侧: 复制自定义 APK (build-packages 产物, 如 adbd) 到 chroot /tmp
+# 注意: CUSTOM_APK_DIR 是宿主路径, chroot 内不可见, 必须先复制
+#if [ -n "${CUSTOM_APK_DIR:-}" ] && [ -d "$CUSTOM_APK_DIR" ] && ls "$CUSTOM_APK_DIR"/*.apk >/dev/null 2>&1; then
+#    log "Installing custom APKs from \${CUSTOM_APK_DIR}..."
+#    mkdir -p "${CHROOT}/tmp"
+#    cp "$CUSTOM_APK_DIR"/*.apk "${CHROOT}/tmp/"
+#fi
+
+chroot "${CHROOT}" /bin/sh -c "
+  # merge-usr 必须先于 apk add: pmOS initramfs 文件列表要求 /usr/sbin/xxx 路径,
+  # 而内核包安装时 mkinitfs trigger 立即运行, 晚了会因缺 /usr/sbin/losetup 失败
+  # (apk.static 引导阶段无法执行 aarch64 post-install, 所以手动执行)
+  /usr/bin/merge-usr
+
+  # regulatory.db (+p7s 签名) 打入 initramfs: 内核在 initramfs 阶段请求
+  # WiFi 监管库, 主系统挂载后不重试; 缺 db -> failed(-2), 缺 p7s -> 签名验证失败
+  mkdir -p /etc/mkinitfs/files-extra
+  cat > /etc/mkinitfs/files-extra/regulatory.files <<'EOF'
+/lib/firmware/regulatory.db
+/lib/firmware/regulatory.db.p7s
+EOF
+
+  # fstab 必须先于内核安装: mkinitfs trigger 在 apk add 结束时运行,
+  # boot-deploy 从 fstab 读取 UUID/options 生成 pmos_root_uuid/pmos_rootfsopts
+  # 若 fstab 后写, extlinux.conf 缺 root 定位参数 -> 无法引导
+  # (固定文件系统 UUID, mkfs -U 指定; /var/lib 独立 @var_lib subvolume + nodatacow)
+  cat > /etc/fstab <<EOF
+UUID=${ROOTFS_FS_UUID} /         btrfs subvol=@,compress=zstd,noatime,discard=async,ssd 0 1
+UUID=${ROOTFS_FS_UUID} /var/lib  btrfs subvol=@var_lib,compress=zstd,noatime,discard=async,ssd,nodatacow 0 0
+UUID=${BOOT_FS_UUID}   /boot     ext2  noatime 0 2
+EOF
+
+  apk add --no-cache --allow-untrusted postmarketos-keys
+  apk add --no-cache \
+      postmarketos-base \
+      postmarketos-mkinitfs \
+      postmarketos-installkernel \
+      boot-deploy \
+      ${DEVICE_PKG} \
+      linux-postmarketos-qcom-msm8916 \
+      soc-qcom-msm8916-gpu \
+      gadget-tool \
+      postmarketos-base-ui-networkmanager \
+      postmarketos-base-ui-wifi-iwd \
+      iwd-openrc \
+      networkmanager-openrc \
+      dbus-openrc \
+      modemmanager \
+      rmtfs \
+      rmtfs-openrc \
+      msm-firmware-loader \
+      qrtr \
+      qmi-utils \
+      qmi-ping \
+      qmic \
+      libqmi \
+      libqmi-bash-completion \
+      iperf3 \
+      iptables \
+      nftables \
+      podman \
+      podman-docker \
+      slirp4netns \
+      fuse-overlayfs \
+      shadow-uidmap \
+      shadow \
+      bash \
+      chrony \
+      curl \
+      wget \
+      neovim \
+      htop \
+      vnstat \
+      util-linux \
+      e2fsprogs-extra \
+      btrfs-progs \
+      tzdata
+
+  # 生成 SSH host keys (bootstrap 阶段 apk.static 无法执行 aarch64 post-install)
+  # 缺失时 sshd 报 'no hostkeys available' 拒绝启动
+  # pmOS 默认 SSH = openssh-server-pam (postmarketos-base-ssh 依赖), sshd.pam 同样需要 keys
+  [ -e /etc/ssh/ssh_host_ed25519_key ] || ssh-keygen -A
+
+  # 安装自定义 APK (已注释, 见文件头说明; 需要时取消注释)
+  #if ls /tmp/*.apk >/dev/null 2>&1; then
+  #  apk add --no-cache --allow-untrusted /tmp/*.apk
+  #  rm -f /tmp/*.apk
+  #fi
+
+  # 清除缓存, 减小镜像体积
+  rm -rf /var/cache/apk/*
+"
+
+# 内核包 dtbs 缺少的板子 (jz01-45-v33 / fy-mf800), 从仓库复制自定义 dtb
+case "$BOARD" in
+  jz01-45-v33)
+    log "Copying custom dtb for ${BOARD}..."
+    mkdir -p "${CHROOT}/boot/dtbs/qcom"
+    cp "dtbs/msm8916-jz01-45-v33.dtb" "${CHROOT}/boot/dtbs/qcom/" ;;
+  fy-mf800)
+    log "Copying custom dtb for ${BOARD}..."
+    mkdir -p "${CHROOT}/boot/dtbs/qcom"
+    cp "dtbs/msm8916-fy-mf800.dtb" "${CHROOT}/boot/dtbs/qcom/" ;;
+esac

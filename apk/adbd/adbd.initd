@@ -1,0 +1,54 @@
+#!/sbin/openrc-run
+# Android Debug Bridge daemon (UZ801)
+# USB gadget: ncm/rndis (udev/initramfs) + ffs.adb (functionfs) 复合
+
+description="Android Debug Bridge daemon"
+
+CONFIGFS="/sys/kernel/config/usb_gadget/g1"
+FFS_MOUNT="/dev/usb-ffs/adb"
+
+depend() {
+	need localmount
+	after udev net
+}
+
+start_pre() {
+	# functionfs 挂载点
+	mkdir -p "$FFS_MOUNT" 2>/dev/null
+	# configfs 函数 (创建后 functionfs 文件系统才注册)
+	if [ ! -d "$CONFIGFS/functions/ffs.adb" ]; then
+		mkdir -p "$CONFIGFS/functions/ffs.adb"
+	fi
+	# 挂载 functionfs (adbd 通过 ep0 写描述符)
+	if ! mountpoint -q "$FFS_MOUNT"; then
+		mount -t functionfs adb "$FFS_MOUNT" 2>/dev/null || true
+	fi
+}
+
+start() {
+	ebegin "Starting adbd"
+	start-stop-daemon --start --background \
+		--exec /usr/bin/adbd -- $ADBD_OPTS
+	# 等待 adbd 写入描述符 (ffs ready=1)
+	local i=0
+	while [ "$(cat "$CONFIGFS/functions/ffs.adb/ready" 2>/dev/null)" != "1" ] && [ $i -lt 10 ]; do
+		sleep 1
+		i=$((i+1))
+	done
+	# 链接 ffs.adb 到 config (UDC 已绑定时需先解绑, 再重绑)
+	if [ ! -L "$CONFIGFS/configs/c.1/ffs.adb" ]; then
+		local udc="$(cat "$CONFIGFS/UDC" 2>/dev/null)"
+		echo "" > "$CONFIGFS/UDC" 2>/dev/null || true
+		ln -s "$CONFIGFS/functions/ffs.adb" "$CONFIGFS/configs/c.1/" 2>/dev/null || true
+		if [ -n "$udc" ]; then
+			echo "$udc" > "$CONFIGFS/UDC" 2>/dev/null || true
+		fi
+	fi
+	eend $?
+}
+
+stop() {
+	ebegin "Stopping adbd"
+	start-stop-daemon --stop --exec /usr/bin/adbd
+	eend $?
+}

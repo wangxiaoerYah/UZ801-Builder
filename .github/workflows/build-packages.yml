@@ -1,0 +1,69 @@
+name: build-packages
+# 通用 APK 构建 workflow
+# - workflow_dispatch: 手动触发 (选择构建所有 apk/*/ 下的包)
+# - workflow_call:     被 build.yml 或其他 workflow 调用
+# 模块化: apk/<包名>/APKBUILD 即一个可构建的包, 遍历自动构建
+# runner: ubuntu-24.04-arm (原生 ARM64, Alpine 容器直接运行, 无需 qemu)
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      apk_list:
+        description: "构建成功的 APK 文件列表 (逗号分隔)"
+        value: ${{ jobs.build.outputs.apk_list }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      apk_list: ${{ steps.collect.outputs.apk_list }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Build all packages in apk/
+        run: |
+          set -e
+          mkdir -p artifacts
+          failed=0
+          for d in apk/*/; do
+            [ -f "$d/APKBUILD" ] || continue
+            name="$(basename "$d")"
+            echo "===== Building package: $name ====="
+            # 原生 ARM64 容器 (Alpine 3.24, 与 pmOS v26.06 基础一致)
+            docker run --rm \
+              -v "$PWD/$d":/pkg:Z \
+              -v "$PWD/src":/src:ro,Z \
+              alpine:3.24 sh -c 'sh /pkg/build.sh' \
+            || { echo "::error::$name 构建失败"; failed=1; continue; }
+            # 导出 apk 到 artifacts (排除 submodule 等)
+            cp "$d"/*.apk artifacts/ 2>/dev/null || true
+            # 清理包目录 (避免污染 git 工作区)
+            rm -rf "$d"/tmp "$d"/src 2>/dev/null || true
+            rm -f "$d"/*.apk 2>/dev/null || true
+          done
+          if [ "$failed" != "0" ]; then
+            echo "::error::部分包构建失败"
+            exit 1
+          fi
+
+      - name: Collect APK list
+        id: collect
+        run: |
+          ls -la artifacts/
+          if [ -z "$(ls artifacts/*.apk 2>/dev/null)" ]; then
+            echo "::error::未生成任何 APK"
+            exit 1
+          fi
+          list="$(ls artifacts/*.apk | xargs -n1 basename | paste -sd,)"
+          echo "apk_list=$list" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: pmos-apks
+          path: artifacts/*.apk
+          if-no-files-found: error
