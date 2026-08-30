@@ -6,7 +6,7 @@ FNAME=$(basename "${SRC}")
 
 TMPDIR=$(mktemp -d)
 
-# 1. 立即注册退出清理陷阱（无论脚本成功还是中途报错均会安全释放）
+# 1. 立即注册退出清理陷阱
 cleanup() {
     rm -rf "${TMPDIR}"
 }
@@ -14,15 +14,15 @@ trap cleanup EXIT INT TERM
 
 mkdir -p files
 
-# 2. 创建 GPT 分区表
-truncate -s 179323904 "${TMPDIR}/gpt.img"
+# 2. 创建 GPT 分区表 (总扇区数: 481314 扇区 = 246432768 字节)
+truncate -s 246432768 "${TMPDIR}/gpt.img"
 
 cat << EOF | sfdisk "${TMPDIR}/gpt.img"
 label: gpt
 label-id: DB708ACF-2E04-8DE2-BAFE-30C9B26444C5
 unit: sectors
 first-lba: 34
-last-lba: 350208
+last-lba: 481280
 sector-size: 512
 
 gpt.img1 : start=        4096, size=           2, type=57B90A16-22C9-E33B-8F5D-0E81686A68CB, uuid=89BEF928-6B3F-432E-970E-46926F6BD579, name="fsc"
@@ -37,14 +37,14 @@ gpt.img9 : start=      210978, size=        1024, type=098DF793-D712-413D-9D4E-8
 gpt.img10 : start=      212002, size=        1024, type=DEA0BA2C-CBDD-4805-B4F9-F428251C3E98, uuid=B166535F-4B99-48F6-AA77-16F27669FD2F, name="sbl1"
 gpt.img11 : start=      213026, size=        2048, type=A053AA7F-40B8-4B1C-BA08-2F68AC71A4F4, uuid=A983B7C4-FC3A-4F88-823E-91D5DB06337F, name="tz"
 gpt.img12 : start=      215074, size=        2048, type=400FFDCD-22E0-47E7-9A23-F16ED9382388, uuid=22675009-60A3-401F-8D3F-44CD32ED394C, name="aboot"
-gpt.img13 : start=      217122, size=      131072, type=20117F86-E985-4357-B9EE-374BC1D8487D, uuid=80780B1D-0FE1-27D3-23E4-9244E62F8C46, name="boot"
-gpt.img14 : start=      348194, size=        2015, type=1B81E7E6-F50D-419B-A739-2AEEF8DA3335, uuid=A7AB80E8-E9D1-E8CD-F157-93F69B1D141E, name="rootfs"
+gpt.img13 : start=      217122, size=      262144, type=20117F86-E985-4357-B9EE-374BC1D8487D, uuid=80780B1D-0FE1-27D3-23E4-9244E62F8C46, name="boot"
+gpt.img14 : start=      479266, size=        2015, type=1B81E7E6-F50D-419B-A739-2AEEF8DA3335, uuid=A7AB80E8-E9D1-E8CD-F157-93F69B1D141E, name="rootfs"
 EOF
 
 # 3. 合成 fastboot 格式分区镜像
 dd if="${TMPDIR}/gpt.img" of=files/gpt_both0.bin bs=512 count=34
 dd if="${TMPDIR}/gpt.img" bs=512 skip=2 count=32 >> files/gpt_both0.bin
-dd if="${TMPDIR}/gpt.img" bs=512 skip=350241 >> files/gpt_both0.bin
+dd if="${TMPDIR}/gpt.img" bs=512 skip=481313 >> files/gpt_both0.bin
 
 # 4. 下载并校验高通官方固件
 echo "Downloading Qualcomm firmware..."

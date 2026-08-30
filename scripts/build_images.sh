@@ -13,12 +13,12 @@ trap cleanup EXIT INT TERM
 rm -f rootfs.raw boot.raw
 mkdir -p files mnt
 
-# 3. 创建并打包 boot 分区镜像 (64MB ext2)
+# 3. 创建并打包 boot 分区镜像 (128MB ext4)
 echo "Creating boot image..."
-truncate -s 67108864 boot.raw
-mkfs.ext2 -F -L boot boot.raw
+truncate -s 134217728 boot.raw
+mkfs.ext4 -F -L boot boot.raw
 mount -o loop boot.raw mnt
-tar xf rootfs.tgz -C mnt ./boot --exclude='./boot/linux.efi' --strip-components=2
+tar xf rootfs.tgz -C mnt ./boot --strip-components=2
 umount mnt
 
 # 4. 创建并打包 rootfs 分区镜像 (1.5GB ext4)
@@ -26,7 +26,7 @@ echo "Creating rootfs image..."
 truncate -s 1610612736 rootfs.raw
 mkfs.ext4 -F -L rootfs rootfs.raw
 mount -o loop rootfs.raw mnt
-tar xpf rootfs.tgz -C mnt --exclude='./boot/*' --exclude='./root/*' --exclude='./dev/*'
+tar xpf rootfs.tgz -C mnt --exclude='./boot/*' --exclude='./dev/*'
 
 # 安装 gadget-tool 与 USB 配置文件
 if [ -d "dist" ]; then

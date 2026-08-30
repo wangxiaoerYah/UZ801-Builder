@@ -44,14 +44,14 @@ deb http://deb.debian.org/debian-security/ ${RELEASE}-security main contrib non-
 deb http://deb.debian.org/debian ${RELEASE}-updates main contrib non-free-firmware
 EOF
 
-# 5. 挂载宿主机虚拟文件系统
+# 5. 挂载宿主机虚拟文件系统（安装内核生成 initramfs 必须依赖 proc/sys/dev）
 mount -t proc proc "${CHROOT}/proc/"
 mount -t sysfs sys "${CHROOT}/sys/"
 mount -o bind /dev/ "${CHROOT}/dev/"
 mount -o bind /dev/pts/ "${CHROOT}/dev/pts/"
 mount -o bind /run "${CHROOT}/run/"
 
-# 6. 执行内部 setup 脚本
+# 6. 执行内部 setup 脚本（在此步骤自动安装原生内核与 u-boot-menu）
 cp scripts/setup.sh "${CHROOT}"
 chroot "${CHROOT}" ${CHROOT_PREFIX} /bin/sh -c /setup.sh
 
@@ -80,24 +80,12 @@ cat << EOF > "${CHROOT}/etc/udev/rules.d/99-nm-usb0.rules"
 SUBSYSTEM=="net", ACTION=="add|change|move", ENV{DEVTYPE}=="gadget", ENV{NM_UNMANAGED}="0"
 EOF
 
-# 12. 安装内核与 Extlinux 引导配置
-wget -O - http://mirror.postmarketos.org/postmarketos/v26.06/aarch64/linux-postmarketos-qcom-msm8916-6.12.1-r5.apk \
-    | tar xkzf - -C "${CHROOT}" --exclude=.PKGINFO --exclude=.SIGN* 2>/dev/null
-
-mkdir -p "${CHROOT}/boot/extlinux"
-cp configs/extlinux.conf "${CHROOT}/boot/extlinux"
-
-# 复制设备树 DTB 文件
-cp dtbs/* "${CHROOT}/boot/dtbs/qcom"
-
-# 创建固件存放目录
+# 12. 创建固件加载目录并配置 fstab
 mkdir -p "${CHROOT}/lib/firmware/msm-firmware-loader"
+printf "PARTUUID=80780b1d-0fe1-27d3-23e4-9244e62f8c46\t/boot\text4\tdefaults,noatime\t0 2\n" > "${CHROOT}/etc/fstab"
 
-# 更新 fstab
-printf "PARTUUID=80780b1d-0fe1-27d3-23e4-9244e62f8c46\t/boot\text2\tdefaults\t0 2\n" > "${CHROOT}/etc/fstab"
-
-# 打包前清理静态 QEMU 文件（如果存在）
+# 13. 打包前清理静态 QEMU 文件（如果存在）
 rm -f "${CHROOT}/usr/bin/qemu-aarch64-static"
 
-# 13. 打包 rootfs
+# 14. 打包 rootfs
 tar cpzf rootfs.tgz -C rootfs .
