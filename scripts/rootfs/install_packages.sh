@@ -49,6 +49,11 @@ chroot "${CHROOT}" /bin/sh -c "
   rm -rf /var/cache/apk/*
 "
 
+# merge-usr: 合并 /bin /sbin /lib -> /usr/*
+# apk.static 引导阶段 (宿主侧) 无法执行 aarch64 post-install, 需手动执行
+# pmOS initramfs 文件列表要求 /usr/sbin/losetup 等, 不合并则 mkinitfs 失败
+chroot "${CHROOT}" /bin/sh -c '/usr/bin/merge-usr'
+
 # 内核包 dtbs 缺少的板子 (jz01-45-v33 / fy-mf800), 从仓库复制自定义 dtb
 case "$BOARD" in
   jz01-45-v33)
