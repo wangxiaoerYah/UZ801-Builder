@@ -29,7 +29,7 @@ PYEOF
 
 echo "=== 3. Alpine 容器构建 (aarch64, 源码=submodule) ==="
 sudo podman run --rm --network host --platform linux/arm64 \
-	-v "$HERE":/work:Z -v "$REPO/src/adbd-linux":/src/adbd-linux:Z alpine:3.24 sh -c '
+	-v "$HERE":/work:Z -v "$REPO/src/adbd-linux":/src/adbd-linux:ro,Z alpine:3.24 sh -c '
 apk add --no-cache abuild alpine-sdk openssl-dev libcap-dev linux-headers glib-dev libcap openssl >/dev/null 2>&1
 addgroup -S abuild >/dev/null 2>&1
 adduser -D builder >/dev/null 2>&1

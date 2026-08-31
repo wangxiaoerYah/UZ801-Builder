@@ -15,9 +15,13 @@ source="adbd-linux-fixes.patch
 	adbd.initd
 	adbd.confd"
 
-builddir="$startdir/../../src/adbd-linux"
+# submodule (src/adbd-linux) 为只读源码, prepare 复制到构建目录再打补丁
+builddir="$srcdir/adbd-linux"
 
 prepare() {
+	# 从 submodule 复制源码 (保持 submodule 原版不被污染)
+	mkdir -p "$builddir"
+	cp -a "$startdir/../../src/adbd-linux/." "$builddir/"
 	cd "$builddir"
 	# 应用 openssl 3.x / musl / functionfs 修复
 	patch -p1 < "$srcdir/adbd-linux-fixes.patch" || return 1

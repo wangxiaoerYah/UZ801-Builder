@@ -36,7 +36,7 @@ jobs:
             # 原生 ARM64 容器 (Alpine 3.24, 与 pmOS v26.06 基础一致)
             docker run --rm \
               -v "$PWD/$d":/pkg:Z \
-              -v "$PWD/src":/src:Z \
+              -v "$PWD/src":/src:ro,Z \
               alpine:3.24 sh -c '
                 apk add --no-cache abuild alpine-sdk sudo >/dev/null 2>&1
                 addgroup -S abuild >/dev/null 2>&1
