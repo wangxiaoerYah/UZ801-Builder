@@ -61,6 +61,8 @@ apt-get install -qqy --no-install-recommends \
     net-tools network-manager openssh-server qrtr-tools rmtfs sudo \
     systemd-timesyncd tzdata wireguard-tools wpasupplicant
 
+u-boot-update
+
 apt-get autoremove -qqy
 apt-get clean
 rm -rf /var/lib/apt/lists/*

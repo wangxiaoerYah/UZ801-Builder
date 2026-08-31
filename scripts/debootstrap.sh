@@ -43,7 +43,7 @@ EOF
 echo "Creating and mounting raw boot image..."
 mkdir -p "${CHROOT}/boot"
 truncate -s 268435456 boot.raw
-mkfs.ext2 -m 0 -L boot boot.raw
+mkfs.ext4 -m 0 -L boot boot.raw
 mount -o loop boot.raw "${CHROOT}/boot"
 
 # 挂载其他虚拟文件系统
@@ -80,7 +80,7 @@ EOF
 mkdir -p "${CHROOT}/lib/firmware/msm-firmware-loader"
 cat << EOF > "${CHROOT}/etc/fstab"
 PARTLABEL=rootfs  /      ext4  defaults,noatime  0  1
-PARTLABEL=boot    /boot  ext2  defaults,noatime  0  2
+PARTLABEL=boot    /boot  ext4  defaults,noatime  0  2
 EOF
 
 rm -f "${CHROOT}/usr/bin/qemu-aarch64-static"
