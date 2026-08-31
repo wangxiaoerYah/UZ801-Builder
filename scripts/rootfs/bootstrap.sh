@@ -8,6 +8,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 log "Bootstrapping apk (aarch64)..."
 
+# 新建的 @ subvolume 是空的, 先创建基础目录
+mkdir -p "${CHROOT}/etc/apk" "${CHROOT}/usr/bin"
+
 # 软件仓库: Alpine main/community + postmarketOS 官方
 cat > "${CHROOT}/etc/apk/repositories" <<EOF
 ${MIRROR}/${ALPINE_RELEASE}/main
@@ -17,7 +20,6 @@ EOF
 cp /etc/resolv.conf "${CHROOT}/etc/"
 
 # qemu 用户态模拟 (仅 x86_64 宿主需要)
-mkdir -p "${CHROOT}/usr/bin"
 if [ "$(uname -m)" != "aarch64" ]; then
   cp "$(which qemu-aarch64-static)" "${CHROOT}/usr/bin/"
 fi
