@@ -45,7 +45,11 @@ EOF
       qrtr \
       openssh-server \
       qmi-utils \
+      qmi-ping \
+      qmic \
       libqmi \
+      libqmi-bash-completion \
+      iperf3 \
       iptables \
       nftables \
       shadow \

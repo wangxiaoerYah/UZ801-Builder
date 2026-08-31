@@ -28,9 +28,9 @@ EOF
 echo "${HOST_NAME}" > "${CHROOT}/etc/hostname"
 sed -i "/localhost/ s/$/ ${HOST_NAME}/" "${CHROOT}/etc/hosts"
 
-# ---- 串口控制台自动登录 (headless, 无屏幕) ----
+# ---- 串口控制台 root 自动登录 (headless, 无屏幕; 与 Alpine 验证版一致) ----
 sed -i '/^tty/ s/^/#/' "${CHROOT}/etc/inittab"
-echo 'ttyMSM0::respawn:/sbin/getty -L 115200 ttyMSM0 vt100' >> "${CHROOT}/etc/inittab"
+echo 'ttyMSM0::respawn:/bin/sh' >> "${CHROOT}/etc/inittab"
 
 # ---- 默认用户 user / 密码 1 ----
 chroot "${CHROOT}" /bin/sh -c '
