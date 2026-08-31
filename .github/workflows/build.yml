@@ -19,7 +19,13 @@ env:
   RELEASE_INPUT: ${{ inputs.release || 'v26.06' }}
 
 jobs:
+  # 独立 APK 构建 workflow (手动可触发, 也被本 workflow 调用)
+  # 产出: 所有 apk/ 下包的 .apk (artifact: pmos-apks)
+  build-packages:
+    uses: ./.github/workflows/build-packages.yml
+
   build:
+    needs: build-packages
     runs-on: ubuntu-24.04-arm   # 原生 ARM64, 无需 QEMU 交叉模拟
     permissions:
       contents: write
@@ -28,6 +34,15 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: true
+
+      # 下载 build-packages 构建的 APK (如 adbd), 供 rootfs 安装
+      - uses: actions/download-artifact@v7
+        with:
+          name: pmos-apks
+          path: apk-artifacts
+          # 若该 workflow 未产出 apk (如手动单独跑 build), 不阻塞
+          # 由于 build-packages 是硬依赖, 正常情况下必有产物
+        continue-on-error: true
 
       - name: Install dependencies
         run: sudo sh -e scripts/install_deps.sh
@@ -39,7 +54,9 @@ jobs:
         run: sudo sh -e scripts/extract_fw.sh
 
       - name: Create postmarketOS rootfs
-        run: sudo env BOARD=${BOARD} RELEASE_INPUT=${RELEASE_INPUT} sh -e scripts/pmos_rootfs.sh
+        run: sudo env BOARD=${BOARD} RELEASE_INPUT=${RELEASE_INPUT} CUSTOM_APK_DIR=${CUSTOM_APK_DIR:-} sh -e scripts/pmos_rootfs.sh
+        env:
+          CUSTOM_APK_DIR: ${{ github.workspace }}/apk-artifacts
 
       - name: Create images
         run: sudo sh -e scripts/build_images.sh

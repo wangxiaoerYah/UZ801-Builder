@@ -13,3 +13,6 @@
 [submodule "src/libusbgx"]
 	path = src/libusbgx
 	url = https://github.com/linux-usb-gadgets/libusbgx
+[submodule "src/adbd-linux"]
+	path = src/adbd-linux
+	url = https://github.com/tonyho/adbd-linux.git

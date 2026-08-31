@@ -77,6 +77,13 @@ EOF
   # pmOS 默认 SSH = openssh-server-pam (postmarketos-base-ssh 依赖), sshd.pam 同样需要 keys
   [ -e /etc/ssh/ssh_host_ed25519_key ] || ssh-keygen -A
 
+  # 安装自定义 APK (workflow build-packages 产物, 如 adbd)
+  if [ -n "\${CUSTOM_APK_DIR:-}" ] && [ -d "\$CUSTOM_APK_DIR" ] && ls "\$CUSTOM_APK_DIR"/*.apk >/dev/null 2>&1; then
+    cp "\$CUSTOM_APK_DIR"/*.apk /tmp/
+    apk add --no-cache --allow-untrusted /tmp/*.apk
+    rm -f /tmp/*.apk
+  fi
+
   # 清除缓存, 减小镜像体积
   rm -rf /var/cache/apk/*
 "
