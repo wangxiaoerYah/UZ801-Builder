@@ -52,8 +52,12 @@ U_BOOT_ROOT="root=PARTUUID=a7ab80e8-e9d1-e8cd-f157-93f69b1d141e"
 U_BOOT_PARAMETERS="console=ttyMSM0,115200 earlycon no_framebuffer=true rw rootwait audit=0"
 U_BOOT_FDT="qcom/msm8916-yiming-uz801v3.dtb"
 U_BOOT_FDT_DIR="/dtbs/"
-U_BOOT_SYNC_DTBS="true"
 EOF
+
+KERNEL_VER=$(ls /lib/modules | head -n 1)
+if [ -d "/usr/lib/linux-image-${KERNEL_VER}/qcom" ]; then
+    cp -r "/usr/lib/linux-image-${KERNEL_VER}/qcom/"* /boot/dtbs/
+fi
 
 # 显式触发更新引导配置
 u-boot-update

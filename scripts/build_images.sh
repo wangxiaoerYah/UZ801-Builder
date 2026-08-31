@@ -19,6 +19,7 @@ truncate -s 134217728 boot.raw
 mkfs.ext4 -F -L boot boot.raw
 mount -o loop boot.raw mnt
 tar xf rootfs.tgz -C mnt ./boot --strip-components=2
+ln -sf . mnt/boot
 umount mnt
 
 # 4. 创建并打包 rootfs 分区镜像 (1.5GB ext4)

@@ -14,7 +14,7 @@ fi
 
 # 2. 注册异常中断清理陷阱
 cleanup_mounts() {
-    for a in proc sys dev/pts dev run; do
+    for a in proc sys dev/pts dev run boot; do
         umount -l "${CHROOT}/${a}" 2>/dev/null || true
     done
 }
@@ -45,8 +45,10 @@ deb http://deb.debian.org/debian ${RELEASE}-updates main contrib non-free-firmwa
 EOF
 
 # 5. 挂载宿主机虚拟文件系统（安装内核生成 initramfs 必须依赖 proc/sys/dev）
+mkdir -p "${CHROOT}/boot"
 mount -t proc proc "${CHROOT}/proc/"
 mount -t sysfs sys "${CHROOT}/sys/"
+mount -t tmpfs tmpfs "${CHROOT}/boot/"
 mount -o bind /dev/ "${CHROOT}/dev/"
 mount -o bind /dev/pts/ "${CHROOT}/dev/pts/"
 mount -o bind /run "${CHROOT}/run/"
