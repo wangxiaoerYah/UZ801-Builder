@@ -49,6 +49,9 @@ EOF
       libqmi \
       libqmi-bash-completion \
       iperf3 \
+      # Alpine 的 iptables 即 iptables-nft (nftables 后端兼容层),
+      # 保留以支持传统 iptables 命令语法, 实际规则走 nft
+      iptables \
       nftables \
       shadow \
       bash \
