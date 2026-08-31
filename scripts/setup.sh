@@ -17,6 +17,34 @@ MODULES=most
 COMPRESS=gzip
 EOF
 
+mkdir -p /etc/kernel/postrm.d
+cat << 'EOF' > /etc/kernel/postrm.d/10-dtb-clean
+#!/bin/sh
+set -e
+KVER="$1"
+if [ -n "${KVER}" ] && [ -d "/boot/dtbs/${KVER}" ]; then
+    rm -rf "/boot/dtbs/${KVER}"
+    echo "Cleaned up all DTBs for kernel ${KVER}"
+fi
+EOF
+chmod +x /etc/kernel/postrm.d/10-dtb-clean
+
+mkdir -p /etc/kernel/postinst.d
+cat << 'EOF' > /etc/kernel/postinst.d/10-dtb-sync
+#!/bin/sh
+set -e
+KVER="$1"
+DTB_SRC="/usr/lib/linux-image-${KVER}/qcom"
+
+# 将整个 qcom 目录完整拷贝到特定版本号的目录下
+if [ -d "${DTB_SRC}" ]; then
+    mkdir -p "/boot/dtbs/${KVER}/qcom"
+    cp -a "${DTB_SRC}/." "/boot/dtbs/${KVER}/qcom/"
+    echo "Synced all qcom DTBs for kernel ${KVER}"
+fi
+EOF
+chmod +x /etc/kernel/postinst.d/10-dtb-sync
+
 # 3. 安装 Debian 官方内核、引导组件及系统服务
 apt-get update -qqy
 apt-get upgrade -qqy
@@ -51,16 +79,11 @@ cat << 'EOF' > /etc/default/u-boot
 U_BOOT_ROOT="root=PARTUUID=a7ab80e8-e9d1-e8cd-f157-93f69b1d141e"
 U_BOOT_PARAMETERS="console=ttyMSM0,115200 earlycon no_framebuffer=true rw rootwait audit=0"
 U_BOOT_FDT="qcom/msm8916-yiming-uz801v3.dtb"
-U_BOOT_FDT_DIR="/dtbs/"
 EOF
 
-mkdir -p /boot/dtbs
 
 KERNEL_VER=$(ls /lib/modules | head -n 1)
-if [ -d "/usr/lib/linux-image-${KERNEL_VER}/qcom" ]; then
-    cp -r "/usr/lib/linux-image-${KERNEL_VER}/qcom/"* /boot/dtbs/
-fi
-
+/etc/kernel/postinst.d/10-dtb-sync "${KERNEL_VER}"
 # 显式触发更新引导配置
 u-boot-update
 
