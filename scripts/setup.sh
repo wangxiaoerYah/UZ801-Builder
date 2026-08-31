@@ -15,6 +15,32 @@ MODULES=most
 COMPRESS=xz
 EOF
 
+mkdir -p /etc/kernel/postrm.d
+cat << 'EOF' > /etc/kernel/postrm.d/10-dtb-clean
+#!/bin/sh
+set -e
+KVER="$1"
+if [ -n "${KVER}" ] && [ -d "/boot/dtb-${KVER}" ]; then
+    rm -rf "/boot/dtb-${KVER}"
+fi
+EOF
+chmod +x /etc/kernel/postrm.d/10-dtb-clean
+
+mkdir -p /etc/kernel/postinst.d
+cat << 'EOF' > /etc/kernel/postinst.d/10-dtb-sync
+#!/bin/sh
+set -e
+KVER="$1"
+DTB_SRC="/usr/lib/linux-image-${KVER}/qcom"
+DTB_DST="/boot/dtb-${KVER}/qcom"
+
+if [ -d "${DTB_SRC}" ]; then
+    mkdir -p "${DTB_DST}"
+    cp -a "${DTB_SRC}/." "${DTB_DST}/"
+fi
+EOF
+chmod +x /etc/kernel/postinst.d/10-dtb-sync
+
 # 写入纯正的原生配置
 mkdir -p /etc/default
 cat << 'EOF' > /etc/default/u-boot
@@ -22,7 +48,6 @@ U_BOOT_ROOT="root=PARTLABEL=rootfs"
 U_BOOT_PARAMETERS="console=ttyMSM0,115200 earlycon no_framebuffer=true rw rootwait audit=0"
 U_BOOT_FDT="qcom/msm8916-yiming-uz801v3.dtb"
 U_BOOT_FDT_DIR="/dtb-"
-U_BOOT_SYNC_DTBS="true"
 EOF
 
 # 安装内核。由于 /boot 是真实挂载，dpkg 安装内核时会自动触发 DTB 同步与 u-boot-update
