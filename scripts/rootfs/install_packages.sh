@@ -12,6 +12,17 @@ chroot "${CHROOT}" /bin/sh -c "
   # 而内核包安装时 mkinitfs trigger 立即运行, 晚了会因缺 /usr/sbin/losetup 失败
   # (apk.static 引导阶段无法执行 aarch64 post-install, 所以手动执行)
   /usr/bin/merge-usr
+
+  # fstab 必须先于内核安装: mkinitfs trigger 在 apk add 结束时运行,
+  # boot-deploy 从 fstab 读取 UUID/options 生成 pmos_root_uuid/pmos_rootfsopts
+  # 若 fstab 后写, extlinux.conf 缺 root 定位参数 -> 无法引导
+  # (固定文件系统 UUID, mkfs -U 指定; /var/lib 独立 @var_lib subvolume + nodatacow)
+  cat > /etc/fstab <<EOF
+UUID=${ROOTFS_FS_UUID} /         btrfs subvol=@,compress=zstd,noatime,discard=async,ssd 0 1
+UUID=${ROOTFS_FS_UUID} /var/lib  btrfs subvol=@var_lib,compress=zstd,noatime,discard=async,ssd,nodatacow 0 0
+UUID=${BOOT_FS_UUID}   /boot     ext2  noatime 0 2
+EOF
+
   apk add --no-cache --allow-untrusted postmarketos-keys
   apk add --no-cache \
       postmarketos-base \

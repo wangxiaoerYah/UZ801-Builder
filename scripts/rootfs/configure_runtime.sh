@@ -20,20 +20,10 @@ cat > "${CHROOT}/etc/udev/rules.d/99-nm-usb0.rules" <<'EOF'
 SUBSYSTEM=="net", ACTION=="add|change|move", ENV{DEVTYPE}=="gadget", ENV{NM_UNMANAGED}="0"
 EOF
 
-# ---- fstab: 用固定文件系统 UUID (mkfs -U 指定, 每次构建一致, 可写死) ----
-# 引导链说明:
-#   - boot-deploy 把 fstab 中 UUID= 条目转成 pmos_root_uuid / pmos_boot_uuid cmdline
-#   - pmOS initramfs 用 `blkid --uuid` 匹配 (实测: 只认文件系统 UUID, 不认 PARTUUID!)
-#     因此必须用 mkfs -U 指定的超级块 UUID, 不能用 extract_fw.sh 里的 GPT 分区 UUID
-#   - fstab options 经 boot-deploy 转成 pmos_rootfsopts, 传给 initramfs 的 mount -o
-#     subvol=@ 使 initramfs 挂载到 btrfs 的 @ subvolume (而非顶层)
-#   - /var/lib 独立 @var_lib subvolume, nodatacow (数据库/状态数据禁 CoW)
-cat > "${CHROOT}/etc/fstab" <<EOF
-UUID=${ROOTFS_FS_UUID} /         btrfs subvol=@,compress=zstd,noatime,discard=async,ssd 0 1
-UUID=${ROOTFS_FS_UUID} /var/lib  btrfs subvol=@var_lib,compress=zstd,noatime,discard=async,ssd,nodatacow 0 0
-UUID=${BOOT_FS_UUID}   /boot     ext2  noatime 0 2
-EOF
-
+# fstab 已由 install_packages.sh 在 apk add 前写入 (boot-deploy 需要)
+# 说明: 固定文件系统 UUID (mkfs -U 指定); boot-deploy 据此生成
+#   pmos_root_uuid / pmos_boot_uuid / pmos_rootfsopts (含 subvol=@)
+# pmOS initramfs 用 blkid --uuid 匹配 (实测只认文件系统 UUID, 不认 PARTUUID)
 # ---- 主机名 ----
 echo "${HOST_NAME}" > "${CHROOT}/etc/hostname"
 sed -i "/localhost/ s/$/ ${HOST_NAME}/" "${CHROOT}/etc/hosts"
