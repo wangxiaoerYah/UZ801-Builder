@@ -48,6 +48,13 @@ scripts/
 - 子模块通过 `lib/common.sh` 共享参数 (环境变量可覆盖), 可独立调试
 - 顶层入口负责编排 + 失败清理 (trap → finalize)
 
+## merge-usr (重要坑)
+
+- pmOS 基于 **usrmerge**: `/bin` `/sbin` `/lib` 合并到 `/usr/*` (符号链接)
+- initramfs 文件列表要求 `/usr/sbin/losetup` 等路径, 不合并则 **mkinitfs 失败** (boot 分区无 initramfs/extlinux.conf)
+- apk.static 引导阶段 (宿主侧) 无法执行 aarch64 post-install → merge-usr 需在 `install_packages.sh` 里手动执行
+- 已在 `apk add` 之后执行 `/usr/bin/merge-usr` (实测修复)
+
 ## 版本支持
 
 | RELEASE_INPUT | Alpine 基础 | 设备包名 | 说明 |
