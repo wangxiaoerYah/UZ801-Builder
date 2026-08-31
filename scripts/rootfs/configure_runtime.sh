@@ -91,6 +91,14 @@ net.core.rmem_default = 1048576
 net.core.wmem_default = 1048576
 net.ipv4.tcp_rmem = 4096 131072 16777216
 net.ipv4.tcp_wmem = 4096 16384 16777216
+net.ipv4.tcp_keepalive_time = 600
+net.ipv4.tcp_keepalive_intvl = 75
+EOF
+
+# 服务器场景系统级优化
+cat > "${CHROOT}/etc/sysctl.d/99-server.conf" <<'EOF'
+kernel.panic = 10
+fs.file-max = 65536
 EOF
 
 # ---- NTP (阿里云) ----
