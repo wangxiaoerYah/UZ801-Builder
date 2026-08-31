@@ -77,7 +77,21 @@ chroot "${CHROOT}" /bin/sh -c '
   # SSH (user 用户密码登录; host keys 由 install_packages.sh 生成)
   rc-update add sshd default
   rc-update add local default
+  # 禁用磁盘 swapfile: btrfs 不支持普通 swapfile, 该服务从未生效, 白跑
+  # (zram swap 564M 已足够; 避免每次启动尝试创建 + eMMC 写入)
+  rc-update del swapfile 2>/dev/null || true
 '
+
+# ---- 网络 sysctl: 服务器场景 (USB 供电, 长期在线) ----
+# 增大 TCP 缓冲区 (大文件下载/测速); BBR 内核未编入 (仅 reno/cubic), 保持 cubic
+cat > "${CHROOT}/etc/sysctl.d/99-network.conf" <<'EOF'
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.core.rmem_default = 1048576
+net.core.wmem_default = 1048576
+net.ipv4.tcp_rmem = 4096 131072 16777216
+net.ipv4.tcp_wmem = 4096 16384 16777216
+EOF
 
 # ---- NTP (阿里云) ----
 # 注释 chrony.conf 默认 pool.ntp.org, 追加阿里云 NTP

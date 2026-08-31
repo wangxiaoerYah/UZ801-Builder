@@ -8,7 +8,7 @@ interface-name=wwan0qmi0
 apn=internet
 
 [ipv4]
-dns=1.1.1.1;8.8.8.8;
+dns=223.5.5.5;119.29.29.29;
 method=auto
 
 [ipv6]
