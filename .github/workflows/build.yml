@@ -9,7 +9,7 @@ on:
         default: "yiming-uz801v3"
         type: string
       release:
-        description: "postmarketOS release (v25.12 / v26.06)"
+        description: "postmarketOS release (v26.06)"
         required: true
         default: "v26.06"
         type: string

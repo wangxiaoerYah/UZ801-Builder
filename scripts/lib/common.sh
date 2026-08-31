@@ -11,7 +11,7 @@ log() { printf '[%s] %s\n' "$(basename "$0")" "$*"; }
 fail() { printf '[%s] ERROR: %s\n' "$(basename "$0")" "$*" >&2; exit 1; }
 
 # ---- 可配置参数 (可被环境变量覆盖) -----------------------------------------
-INPUT_RELEASE="${RELEASE_INPUT:-v26.06}"        # postmarketOS 版本 (默认 v26.06, 可选 v25.12)
+INPUT_RELEASE="${RELEASE_INPUT:-v26.06}"        # postmarketOS 版本 (当前仅支持 v26.06)
 BOARD="${BOARD:-yiming-uz801v3}"                # 目标板子
 CHROOT="${CHROOT:-$(pwd)/rootfs}"               # rootfs 挂载点
 HOST_NAME="${HOST_NAME:-openstick}"
@@ -35,11 +35,9 @@ BOOT_IMG="boot.raw"
 ROOT_IMG="rootfs.raw"
 
 # ---- 版本映射: pmOS release -> Alpine release -> apk-tools-static -> 设备包名 ----
-# 注意: v26.06 起 pmOS 将设备包重命名为 device-zhihe-generic (v25.12 为 device-generic-zhihe)
 case "$INPUT_RELEASE" in
   v26.06) ALPINE_RELEASE="v3.24"; APK_TOOLS_STATIC="3.0.7-r0"; DEVICE_PKG="device-zhihe-generic" ;;
-  v25.12) ALPINE_RELEASE="v3.23"; APK_TOOLS_STATIC="3.0.7-r0"; DEVICE_PKG="device-generic-zhihe" ;;
-  *) fail "Unsupported RELEASE_INPUT: $INPUT_RELEASE (支持 v25.12 / v26.06)" ;;
+  *) fail "Unsupported RELEASE_INPUT: $INPUT_RELEASE (仅支持 v26.06)" ;;
 esac
 
 # ---- 板子映射: 板子 -> deviceinfo dtb + lk2nd compatible ----
