@@ -49,7 +49,6 @@ EOF
       libqmi \
       libqmi-bash-completion \
       iperf3 \
-      iptables \
       nftables \
       shadow \
       bash \
