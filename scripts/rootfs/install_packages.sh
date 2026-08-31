@@ -43,7 +43,6 @@ EOF
       rmtfs-openrc \
       msm-firmware-loader \
       qrtr \
-      openssh-server \
       qmi-utils \
       qmi-ping \
       qmic \
@@ -67,6 +66,7 @@ EOF
 
   # 生成 SSH host keys (bootstrap 阶段 apk.static 无法执行 aarch64 post-install)
   # 缺失时 sshd 报 "no hostkeys available" 拒绝启动
+  # pmOS 默认 SSH = openssh-server-pam (postmarketos-base-ssh 依赖), sshd.pam 同样需要 keys
   [ -e /etc/ssh/ssh_host_ed25519_key ] || ssh-keygen -A
 
   # 清除缓存, 减小镜像体积
