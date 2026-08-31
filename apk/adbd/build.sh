@@ -8,11 +8,14 @@ cd /pkg
 echo "=== 安装构建依赖 ==="
 apk update >/dev/null 2>&1 || true
 apk add --no-cache abuild alpine-sdk sudo >/dev/null 2>&1
-# 解析 APKBUILD 的 makedepends 并安装 (按需, 支持任意新包)
-MAKEDEPS=$(grep '^makedepends=' APKBUILD 2>/dev/null | sed -n 's/makedepends="\(.*\)"/\1/p' | tr ' ' '\n' | grep -v '^$' | paste -sd' ')
-if [ -n "$MAKEDEPS" ]; then
-	apk add --no-cache $MAKEDEPS >/dev/null 2>&1 || { echo "::warning::makedepends 部分安装失败: $MAKEDEPS"; }
-fi
+# 解析 APKBUILD 的 depends + makedepends 并安装 (按需, 支持任意新包)
+# depends = 运行时依赖 (abuild 会校验), makedepends = 构建依赖
+for VAR in depends makedepends; do
+	PKGS=$(grep "^$VAR=" APKBUILD 2>/dev/null | sed -n 's/'"$VAR"'="\(.*\)"/\1/p' | tr ' ' '\n' | grep -v '^$' | paste -sd' ')
+	if [ -n "$PKGS" ]; then
+		apk add --no-cache $PKGS >/dev/null 2>&1 || { echo "::warning::$VAR 部分安装失败: $PKGS"; }
+	fi
+done
 
 echo "=== 配置 builder ==="
 addgroup -S abuild 2>/dev/null || true
