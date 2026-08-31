@@ -12,11 +12,12 @@ log "Bootstrapping apk (aarch64)..."
 mkdir -p "${CHROOT}/etc/apk" "${CHROOT}/usr/bin"
 
 # 软件仓库: Alpine main/community + postmarketOS 官方
-# 设备端 repositories 用国内镜像 (构建用官方源, 见 common.sh)
+# 构建阶段用官方源 (CI runner 在海外, 官方快; apk.static 与 chroot 内
+# apk add 都读这个文件)。设备端镜像源由 finalize.sh 在收尾时改写。
 cat > "${CHROOT}/etc/apk/repositories" <<EOF
-${DEVICE_MIRROR}/${ALPINE_RELEASE}/main
-${DEVICE_MIRROR}/${ALPINE_RELEASE}/community
-${DEVICE_PMOS_MIRROR}/${INPUT_RELEASE}
+${MIRROR}/${ALPINE_RELEASE}/main
+${MIRROR}/${ALPINE_RELEASE}/community
+${PMOS_MIRROR}/${INPUT_RELEASE}
 EOF
 cp /etc/resolv.conf "${CHROOT}/etc/"
 

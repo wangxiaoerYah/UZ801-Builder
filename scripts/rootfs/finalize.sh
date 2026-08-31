@@ -6,6 +6,17 @@
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "${HERE}/../lib/common.sh"
 
+log "Finalizing rootfs..."
+
+# 设备端 repositories 改用国内镜像 (构建用官方源, 见 bootstrap.sh):
+# Alpine 阿里云加速, pmOS 中科大镜像 (官方源从国内访问极慢)
+cat > "${CHROOT}/etc/apk/repositories" <<EOF
+${DEVICE_MIRROR}/${ALPINE_RELEASE}/main
+${DEVICE_MIRROR}/${ALPINE_RELEASE}/community
+${DEVICE_PMOS_MIRROR}/${INPUT_RELEASE}
+EOF
+sync
+
 log "Unmounting images..."
 sync
 umount -l "${CHROOT}/proc" 2>/dev/null || true
