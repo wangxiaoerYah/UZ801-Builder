@@ -15,7 +15,7 @@ trap cleanup EXIT INT TERM
 mkdir -p files
 
 # 2. 创建 GPT 分区表 (总扇区数: 481314 扇区 = 246432768 字节)
-truncate -s 380650496 "${TMPDIR}/gpt.img"
+truncate -s 1990234112 "${TMPDIR}/gpt.img"
 
 cat << EOF | sfdisk "${TMPDIR}/gpt.img"
 label: gpt
