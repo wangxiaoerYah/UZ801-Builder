@@ -22,7 +22,7 @@ label: gpt
 label-id: DB708ACF-2E04-8DE2-BAFE-30C9B26444C5
 unit: sectors
 first-lba: 34
-last-lba: 743424
+last-lba: 3887137
 sector-size: 512
 
 gpt.img1 : start=        4096, size=           2, type=57B90A16-22C9-E33B-8F5D-0E81686A68CB, uuid=89BEF928-6B3F-432E-970E-46926F6BD579, name="fsc"
@@ -38,13 +38,13 @@ gpt.img10 : start=      212002, size=        1024, type=DEA0BA2C-CBDD-4805-B4F9-
 gpt.img11 : start=      213026, size=        2048, type=A053AA7F-40B8-4B1C-BA08-2F68AC71A4F4, uuid=A983B7C4-FC3A-4F88-823E-91D5DB06337F, name="tz"
 gpt.img12 : start=      215074, size=        2048, type=400FFDCD-22E0-47E7-9A23-F16ED9382388, uuid=22675009-60A3-401F-8D3F-44CD32ED394C, name="aboot"
 gpt.img13 : start=      217122, size=      524288, type=20117F86-E985-4357-B9EE-374BC1D8487D, uuid=80780B1D-0FE1-27D3-23E4-9244E62F8C46, name="boot"
-gpt.img14 : start=      741410, size=        2015, type=1B81E7E6-F50D-419B-A739-2AEEF8DA3335, uuid=A7AB80E8-E9D1-E8CD-F157-93F69B1D141E, name="rootfs"
+gpt.img14 : start=      741410, size=     3145728, type=1B81E7E6-F50D-419B-A739-2AEEF8DA3335, uuid=A7AB80E8-E9D1-E8CD-F157-93F69B1D141E, name="rootfs"
 EOF
 
 # 3. 合成 fastboot 格式分区镜像
 dd if="${TMPDIR}/gpt.img" of=files/gpt_both0.bin bs=512 count=34
 dd if="${TMPDIR}/gpt.img" bs=512 skip=2 count=32 >> files/gpt_both0.bin
-dd if="${TMPDIR}/gpt.img" bs=512 skip=743457 >> files/gpt_both0.bin
+dd if="${TMPDIR}/gpt.img" bs=512 skip=3887137 >> files/gpt_both0.bin
 
 # 4. 下载并校验高通官方固件
 echo "Downloading Qualcomm firmware..."
