@@ -17,8 +17,12 @@ CHROOT="${CHROOT:-$(pwd)/rootfs}"               # rootfs 挂载点
 HOST_NAME="${HOST_NAME:-openstick}"
 BOOT_SIZE="${BOOT_SIZE:-134217728}"              # boot 分区 128MB (ext2)
 ROOTFS_SIZE="${ROOTFS_SIZE:-1610612736}"        # rootfs 分区 1.5GB (btrfs)
-MIRROR="${MIRROR:-https://mirrors.aliyun.com/alpine}"
+# 构建源 (CI runner 在海外, 官方源快)
+MIRROR="${MIRROR:-https://dl-cdn.alpinelinux.org/alpine}"
 PMOS_MIRROR="${PMOS_MIRROR:-https://mirror.postmarketos.org/postmarketos}"
+# 设备端源 (国内加速: Alpine 阿里云, pmOS 中科大)
+DEVICE_MIRROR="${DEVICE_MIRROR:-https://mirrors.aliyun.com/alpine}"
+DEVICE_PMOS_MIRROR="${DEVICE_PMOS_MIRROR:-https://mirrors.ustc.edu.cn/postmarketos}"
 
 # 固定文件系统 UUID (mkfs 时用 -U 指定, 每次构建一致, fstab 可写死)
 # 注意: 这是文件系统 UUID (超级块), 不是 GPT 分区 UUID (PARTUUID)
