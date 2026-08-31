@@ -8,7 +8,7 @@ arch="aarch64"
 license="Apache-2.0"
 depends="openssl libcap"
 makedepends="openssl-dev libcap-dev linux-headers glib-dev"
-options="!check"
+options="!check !index"
 # 源码来自 submodule: src/adbd-linux (github.com/tonyho/adbd-linux 原版)
 # 本包只含修复 patch 和配置; 构建时直接使用 submodule 目录
 source="adbd-linux-fixes.patch
