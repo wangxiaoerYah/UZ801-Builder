@@ -14,3 +14,5 @@ dist
 !scripts/**
 
 apk/adbd/adbd-linux.tar.gz
+apk/adbd/adbd-linux.tar.gz
+apk/adbd/src/
