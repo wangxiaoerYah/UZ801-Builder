@@ -42,23 +42,16 @@ chroot "${CHROOT}" /bin/sh -c '
 echo 'user ALL=(ALL:ALL) NOPASSWD: ALL' > "${CHROOT}/etc/sudoers.d/user"
 chmod 0440 "${CHROOT}/etc/sudoers.d/user"
 
-# ---- USB 网络: 采用 pmOS 官方 usb-tethering 机制 (NM + unudhcpd) ----
+# ---- USB 网络: 完全采用 pmOS 官方 usb-tethering 机制 (无需额外配置) ----
 # postmarketos-base-ui-networkmanager-usb-tethering 包自带完整方案:
 #   - USB_Networking.nmconnection: usb0 = 172.16.42.1/16 manual (NM 管 IP)
 #   - 50-tethering.sh dispatcher: 连接 up 时 killall unudhcpd -> 重启 unudhcpd
 #     (DHCP 172.16.42.2) + reactivate gadget (电脑重新 DHCP)
 #   - 50-tethering.conf: no-auto-default=usb0, managed=true
-# 与 initramfs 的 unudhcpd (172.16.42.1) 网段一致, 开机后无缝交接。
-# 我们只做: local.d 提前清理 initramfs 残留 unudhcpd (dispatcher 也会处理,
-# 早杀避免 NM 启动前的 DHCP 冲突)。不启用 rc 服务/conf.d, 避免双 unudhcpd。
-mkdir -p "${CHROOT}/etc/local.d"
-cat > "${CHROOT}/etc/local.d/usb-net.start" <<'EOF'
-#!/bin/sh
-# 清理 initramfs 残留的 unudhcpd; NM 连接 up 后由 50-tethering.sh dispatcher
-# 统一管理 unudhcpd (killall + 重启) 和 usb0 IP (USB_Networking 连接)
-pkill -x unudhcpd 2>/dev/null || true
-EOF
-chmod +x "${CHROOT}/etc/local.d/usb-net.start"
+# 与 initramfs 的 unudhcpd (172.16.42.1) 网段一致, 开机后无缝交接:
+# initramfs unudhcpd 残留持续服务引导早期, NM 激活 USB_Networking 连接后
+# dispatcher killall 并重启 unudhcpd (同 IP 网段, 无冲突), 电脑无需干预。
+# 不做任何本地覆盖 (不写 local.d / conf.d / rc 服务), 与官方行为一致。
 
 # ---- OpenRC 服务 ----
 chroot "${CHROOT}" /bin/sh -c '
