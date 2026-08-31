@@ -17,8 +17,8 @@ CHROOT="${CHROOT:-$(pwd)/rootfs}"               # rootfs 挂载点
 HOST_NAME="${HOST_NAME:-openstick}"
 BOOT_SIZE="${BOOT_SIZE:-134217728}"              # boot 分区 128MB (ext2)
 ROOTFS_SIZE="${ROOTFS_SIZE:-1610612736}"        # rootfs 分区 1.5GB (btrfs)
-MIRROR="${MIRROR:-http://dl-cdn.alpinelinux.org/alpine}"
-PMOS_MIRROR="${PMOS_MIRROR:-http://mirror.postmarketos.org/postmarketos}"
+MIRROR="${MIRROR:-https://mirrors.aliyun.com/alpine}"
+PMOS_MIRROR="${PMOS_MIRROR:-https://mirror.postmarketos.org/postmarketos}"
 
 # 固定文件系统 UUID (mkfs 时用 -U 指定, 每次构建一致, fstab 可写死)
 # 注意: 这是文件系统 UUID (超级块), 不是 GPT 分区 UUID (PARTUUID)

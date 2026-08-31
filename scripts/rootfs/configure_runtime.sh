@@ -67,6 +67,7 @@ chroot "${CHROOT}" /bin/sh -c '
   rc-update add modemmanager default
   rc-update add rmtfs default
   rc-update add chronyd default
+
   # zram swap (pmOS 内置: RAM 150%, zstd), 替代 eMMC swap 避免闪存磨损
   rc-update add postmarketos-zram-swap boot
   # swclock-offset (msm8916 RTC 时钟偏移修正, soc-qcom-msm8916-gpu 的依赖)
@@ -77,6 +78,14 @@ chroot "${CHROOT}" /bin/sh -c '
   rc-update add sshd default
   rc-update add local default
 '
+
+# ---- NTP (阿里云) ----
+# 注释 chrony.conf 默认 pool.ntp.org, 追加阿里云 NTP
+sed -i '/^pool / s/^/# /' "${CHROOT}/etc/chrony/chrony.conf"
+mkdir -p "${CHROOT}/etc/chrony/sources.d"
+cat > "${CHROOT}/etc/chrony/sources.d/aliyun.sources" <<'EOF'
+server ntp.aliyun.com iburst
+EOF
 
 # ---- 时区 (默认上海) ----
 ln -sf /usr/share/zoneinfo/Asia/Shanghai "${CHROOT}/etc/localtime"
