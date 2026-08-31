@@ -82,6 +82,15 @@ chroot "${CHROOT}" /bin/sh -c '
   rc-update del swapfile 2>/dev/null || true
 '
 
+# ---- WiFi: 关闭省电 (服务器场景, USB 供电, 无功耗顾虑) ----
+# wcn36xx + iwd 省电模式下帧级延迟高 (实测局域网 ping 15.6ms -> 4.8ms,
+# 下载 1.3 -> 2.3 Mbps)。服务器场景必须关闭。
+mkdir -p "${CHROOT}/etc/iwd"
+cat > "${CHROOT}/etc/iwd/main.conf" <<'EOF'
+[General]
+EnablePowerSave=False
+EOF
+
 # ---- 网络 sysctl: 服务器场景 (USB 供电, 长期在线) ----
 # 增大 TCP 缓冲区 (大文件下载/测速); BBR 内核未编入 (仅 reno/cubic), 保持 cubic
 cat > "${CHROOT}/etc/sysctl.d/99-network.conf" <<'EOF'
