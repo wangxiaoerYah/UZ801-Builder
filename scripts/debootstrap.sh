@@ -42,7 +42,7 @@ EOF
 # 关键改动：提前创建并挂载真实的 boot 分区
 echo "Creating and mounting raw boot image..."
 mkdir -p "${CHROOT}/boot"
-truncate -s 134217728 boot.raw
+truncate -s 268435456 boot.raw
 mkfs.ext2 -m 0 -L boot boot.raw
 mount -o loop boot.raw "${CHROOT}/boot"
 
