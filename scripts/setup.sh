@@ -12,7 +12,7 @@ rm -f "/etc/locale.gen"
 mkdir -p /etc/initramfs-tools/conf.d
 cat << 'EOF' > /etc/initramfs-tools/conf.d/openstick.conf
 MODULES=most
-COMPRESS=gzip
+COMPRESS=xz
 EOF
 
 # 写入纯正的原生配置
@@ -31,7 +31,7 @@ apt-get upgrade -qqy
 apt-get install -qqy --no-install-recommends \
     -o Dpkg::Options::="--force-confdef" \
     -o Dpkg::Options::="--force-confold" \
-    linux-image-arm64 u-boot-menu initramfs-tools bridge-utils dnsmasq \
+    linux-image-arm64 u-boot-menu initramfs-tools xz-utils bridge-utils dnsmasq \
     hostapd iptables libconfig11 locales modemmanager netcat-traditional \
     net-tools network-manager openssh-server qrtr-tools rmtfs sudo \
     systemd-timesyncd tzdata wireguard-tools wpasupplicant
