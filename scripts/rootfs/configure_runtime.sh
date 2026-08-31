@@ -82,6 +82,21 @@ chroot "${CHROOT}" /bin/sh -c '
   rc-update del swapfile 2>/dev/null || true
 '
 
+# ---- LED: WiFi 关联时蓝灯常亮 (phy0assoc trigger) ----
+# local 服务早于 networkmanager, 等待 wlan0 就绪后设置 trigger
+# (内核 ledtrig-netdev: 关联亮/断开灭, 实测验证)
+mkdir -p "${CHROOT}/etc/local.d"
+cat > "${CHROOT}/etc/local.d/led-trigger.start" <<'EOF'
+#!/bin/sh
+# WiFi 关联时蓝灯常亮 (phy0assoc trigger)
+for i in $(seq 1 30); do
+    [ -d /sys/class/net/wlan0 ] && break
+    sleep 1
+done
+echo phy0assoc > /sys/class/leds/blue:wan/trigger 2>/dev/null || true
+EOF
+chmod +x "${CHROOT}/etc/local.d/led-trigger.start"
+
 # ---- podman 容器配置 (服务器场景) ----
 # 无根 (rootless) 子 uid/gid 映射
 cat > "${CHROOT}/etc/subuid" <<'EOF'
