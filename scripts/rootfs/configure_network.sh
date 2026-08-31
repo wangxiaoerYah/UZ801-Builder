@@ -2,7 +2,7 @@
 # =============================================================================
 # rootfs 子模块: 网络配置
 #   - NM 强制 iwd 后端
-#   - lte / usb 连接 (immutable, 不可删除)
+#   - lte 连接 (immutable, 不可删除); usb0 由 unudhcpd 管理 (见 configure_runtime.sh)
 # =============================================================================
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -22,10 +22,10 @@ cat > "${CHROOT}/etc/NetworkManager/conf.d/50-use-iwd.conf" <<'EOF'
 wifi.backend=iwd
 EOF
 
-# lte/usb 连接配置
+# lte 连接 (4G): usb0 不交给 NM, 由 unudhcpd 提供固定 172.16.42.1 + DHCP
+# (RNDIS 仅作 SSH 管理通道, 无需 NM shared 的 NAT/DNS)
 mkdir -p "${CHROOT}/etc/NetworkManager/system-connections"
-cp configs/*.nmconnection "${CHROOT}/etc/NetworkManager/system-connections/"
-chmod 0600 "${CHROOT}/etc/NetworkManager/system-connections/"*
-# lte/usb 连接设为 immutable (不可变), 防止被删除/修改; 需要改动时先 chattr -i
-chattr +i "${CHROOT}/etc/NetworkManager/system-connections/lte.nmconnection" \
-         "${CHROOT}/etc/NetworkManager/system-connections/usb.nmconnection"
+cp configs/lte.nmconnection "${CHROOT}/etc/NetworkManager/system-connections/"
+chmod 0600 "${CHROOT}/etc/NetworkManager/system-connections/lte.nmconnection"
+# lte 连接设为 immutable (不可变), 防止被删除/修改; 需要改动时先 chattr -i
+chattr +i "${CHROOT}/etc/NetworkManager/system-connections/lte.nmconnection"

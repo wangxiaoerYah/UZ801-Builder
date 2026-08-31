@@ -42,18 +42,31 @@ chroot "${CHROOT}" /bin/sh -c '
 echo 'user ALL=(ALL:ALL) NOPASSWD: ALL' > "${CHROOT}/etc/sudoers.d/user"
 chmod 0440 "${CHROOT}/etc/sudoers.d/user"
 
-# ---- USB 网络: 清理 initramfs 残留的 unudhcpd ----
-# initramfs 用 unudhcpd 提供早期 USB 网络 (usb0=172.16.42.1, 电脑=172.16.42.2),
-# switch_root 不终止它, 残留进程与 NM shared 的 dnsmasq DHCP 冲突
-# (电脑可能拿到 172.16.42.2 但网关 172.16.42.1 已被 NM 覆盖 -> 网络不通)
-# local 服务 (字母序在 networkmanager 前) 启动时杀掉, 让 NM 独占 usb0
+# ---- USB 网络: unudhcpd 管理 usb0 (RNDIS 作 SSH 管理通道) ----
+# 设计:
+#   - initramfs 阶段 unudhcpd 提供早期 USB 网络 (172.16.42.1), switch_root 后残留
+#   - 主系统: local.d (字母序早于 networkmanager) 清理残留 + 设 usb0 静态 IP
+#   - unudhcpd 服务 (need net, 在 networkmanager 后) 提供 DHCP (电脑拿 172.16.42.2)
+#   - NM 只管 lte (4G), 不碰 usb0 (无 usb.nmconnection)
 mkdir -p "${CHROOT}/etc/local.d"
 cat > "${CHROOT}/etc/local.d/usb-net.start" <<'EOF'
 #!/bin/sh
-# NM 接管 usb0 前清理 initramfs 残留的 unudhcpd (DHCP 冲突源)
+# 清理 initramfs 残留的 unudhcpd (避免双 DHCP), 配置 usb0 静态 IP
+# (unudhcpd 程序本身不设接口 IP, 需手动配置)
 pkill -x unudhcpd 2>/dev/null || true
+ip addr flush dev usb0 2>/dev/null || true
+ip addr add 172.16.42.1/24 dev usb0 2>/dev/null || true
+ip link set usb0 up 2>/dev/null || true
 EOF
 chmod +x "${CHROOT}/etc/local.d/usb-net.start"
+
+# unudhcpd 服务配置: 与 initramfs 一致的网段 (默认 -s 是 172.16.41.1, 需覆盖)
+mkdir -p "${CHROOT}/etc/conf.d"
+cat > "${CHROOT}/etc/conf.d/unudhcpd" <<'EOF'
+UNUDHCPD_IF="usb0"
+UNUDHCPD_SERVER="172.16.42.1"
+UNUDHCPD_CLIENT="172.16.42.2"
+EOF
 
 # ---- OpenRC 服务 ----
 chroot "${CHROOT}" /bin/sh -c '
@@ -78,6 +91,8 @@ chroot "${CHROOT}" /bin/sh -c '
   # SSH (user 用户密码登录; host keys 由 install_packages.sh 生成)
   rc-update add sshd default
   rc-update add local default
+  # USB RNDIS 管理通道: unudhcpd DHCP (usb0=172.16.42.1, 电脑=172.16.42.2)
+  rc-update add unudhcpd default
 '
 
 # ---- 时区 (默认上海) ----
