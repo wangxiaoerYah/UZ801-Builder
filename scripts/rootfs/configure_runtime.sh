@@ -42,31 +42,23 @@ chroot "${CHROOT}" /bin/sh -c '
 echo 'user ALL=(ALL:ALL) NOPASSWD: ALL' > "${CHROOT}/etc/sudoers.d/user"
 chmod 0440 "${CHROOT}/etc/sudoers.d/user"
 
-# ---- USB 网络: unudhcpd 管理 usb0 (RNDIS 作 SSH 管理通道) ----
-# 设计:
-#   - initramfs 阶段 unudhcpd 提供早期 USB 网络 (172.16.42.1), switch_root 后残留
-#   - 主系统: local.d (字母序早于 networkmanager) 清理残留 + 设 usb0 静态 IP
-#   - unudhcpd 服务 (need net, 在 networkmanager 后) 提供 DHCP (电脑拿 172.16.42.2)
-#   - NM 只管 lte (4G), 不碰 usb0 (无 usb.nmconnection)
+# ---- USB 网络: 采用 pmOS 官方 usb-tethering 机制 (NM + unudhcpd) ----
+# postmarketos-base-ui-networkmanager-usb-tethering 包自带完整方案:
+#   - USB_Networking.nmconnection: usb0 = 172.16.42.1/16 manual (NM 管 IP)
+#   - 50-tethering.sh dispatcher: 连接 up 时 killall unudhcpd -> 重启 unudhcpd
+#     (DHCP 172.16.42.2) + reactivate gadget (电脑重新 DHCP)
+#   - 50-tethering.conf: no-auto-default=usb0, managed=true
+# 与 initramfs 的 unudhcpd (172.16.42.1) 网段一致, 开机后无缝交接。
+# 我们只做: local.d 提前清理 initramfs 残留 unudhcpd (dispatcher 也会处理,
+# 早杀避免 NM 启动前的 DHCP 冲突)。不启用 rc 服务/conf.d, 避免双 unudhcpd。
 mkdir -p "${CHROOT}/etc/local.d"
 cat > "${CHROOT}/etc/local.d/usb-net.start" <<'EOF'
 #!/bin/sh
-# 清理 initramfs 残留的 unudhcpd (避免双 DHCP), 配置 usb0 静态 IP
-# (unudhcpd 程序本身不设接口 IP, 需手动配置)
+# 清理 initramfs 残留的 unudhcpd; NM 连接 up 后由 50-tethering.sh dispatcher
+# 统一管理 unudhcpd (killall + 重启) 和 usb0 IP (USB_Networking 连接)
 pkill -x unudhcpd 2>/dev/null || true
-ip addr flush dev usb0 2>/dev/null || true
-ip addr add 172.16.42.1/24 dev usb0 2>/dev/null || true
-ip link set usb0 up 2>/dev/null || true
 EOF
 chmod +x "${CHROOT}/etc/local.d/usb-net.start"
-
-# unudhcpd 服务配置: 与 initramfs 一致的网段 (默认 -s 是 172.16.41.1, 需覆盖)
-mkdir -p "${CHROOT}/etc/conf.d"
-cat > "${CHROOT}/etc/conf.d/unudhcpd" <<'EOF'
-UNUDHCPD_IF="usb0"
-UNUDHCPD_SERVER="172.16.42.1"
-UNUDHCPD_CLIENT="172.16.42.2"
-EOF
 
 # ---- OpenRC 服务 ----
 chroot "${CHROOT}" /bin/sh -c '
@@ -91,8 +83,6 @@ chroot "${CHROOT}" /bin/sh -c '
   # SSH (user 用户密码登录; host keys 由 install_packages.sh 生成)
   rc-update add sshd default
   rc-update add local default
-  # USB RNDIS 管理通道: unudhcpd DHCP (usb0=172.16.42.1, 电脑=172.16.42.2)
-  rc-update add unudhcpd default
 '
 
 # ---- 时区 (默认上海) ----

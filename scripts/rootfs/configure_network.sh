@@ -22,8 +22,9 @@ cat > "${CHROOT}/etc/NetworkManager/conf.d/50-use-iwd.conf" <<'EOF'
 wifi.backend=iwd
 EOF
 
-# lte 连接 (4G): usb0 不交给 NM, 由 unudhcpd 提供固定 172.16.42.1 + DHCP
-# (RNDIS 仅作 SSH 管理通道, 无需 NM shared 的 NAT/DNS)
+# lte 连接 (4G): usb0 采用 pmOS 官方 usb-tethering 机制
+# (USB_Networking.nmconnection 管 IP 172.16.42.1 + unudhcpd 管 DHCP,
+#  由 postmarketos-base-ui-networkmanager-usb-tethering 包提供, 见 configure_runtime.sh)
 mkdir -p "${CHROOT}/etc/NetworkManager/system-connections"
 cp configs/lte.nmconnection "${CHROOT}/etc/NetworkManager/system-connections/"
 chmod 0600 "${CHROOT}/etc/NetworkManager/system-connections/lte.nmconnection"
