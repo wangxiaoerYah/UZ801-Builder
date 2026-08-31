@@ -59,7 +59,7 @@ jobs:
         id: artifact_upload
         uses: actions/upload-artifact@v7
         with:
-          name: openstick-pmos-${BOARD}
+          name: openstick-pmos-${{ env.BOARD }}
           path: files/*
 
       - name: Generate Release Notes
