@@ -8,6 +8,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 log "Installing postmarketOS base packages (${INPUT_RELEASE})..."
 chroot "${CHROOT}" /bin/sh -c "
+  # merge-usr 必须先于 apk add: pmOS initramfs 文件列表要求 /usr/sbin/xxx 路径,
+  # 而内核包安装时 mkinitfs trigger 立即运行, 晚了会因缺 /usr/sbin/losetup 失败
+  # (apk.static 引导阶段无法执行 aarch64 post-install, 所以手动执行)
+  /usr/bin/merge-usr
   apk add --no-cache --allow-untrusted postmarketos-keys
   apk add --no-cache \
       postmarketos-base \
@@ -48,11 +52,6 @@ chroot "${CHROOT}" /bin/sh -c "
   # 清除缓存, 减小镜像体积
   rm -rf /var/cache/apk/*
 "
-
-# merge-usr: 合并 /bin /sbin /lib -> /usr/*
-# apk.static 引导阶段 (宿主侧) 无法执行 aarch64 post-install, 需手动执行
-# pmOS initramfs 文件列表要求 /usr/sbin/losetup 等, 不合并则 mkinitfs 失败
-chroot "${CHROOT}" /bin/sh -c '/usr/bin/merge-usr'
 
 # 内核包 dtbs 缺少的板子 (jz01-45-v33 / fy-mf800), 从仓库复制自定义 dtb
 case "$BOARD" in

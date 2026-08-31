@@ -68,6 +68,10 @@ chroot "${CHROOT}" /bin/sh -c '
   rc-update add chronyd default
   # zram swap (pmOS 内置: RAM 150%, zstd), 替代 eMMC swap 避免闪存磨损
   rc-update add postmarketos-zram-swap boot
+  # swclock-offset (msm8916 RTC 时钟偏移修正, soc-qcom-msm8916-gpu 的依赖)
+  # post-install 可能因 "swap 虚拟服务冲突" 警告而失败, 这里幂等补上
+  rc-update add swclock-offset-boot boot 2>/dev/null || true
+  rc-update add swclock-offset-shutdown shutdown 2>/dev/null || true
 '
 
 # ---- 时区 (默认上海) ----
