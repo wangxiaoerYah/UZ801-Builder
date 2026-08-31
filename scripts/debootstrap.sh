@@ -12,9 +12,9 @@ if [ -d "${CHROOT}" ]; then
     rm -rf "${CHROOT}"
 fi
 
-# 2. 注册异常中断清理陷阱
+# 2. 注册异常中断清理陷阱（移除 boot）
 cleanup_mounts() {
-    for a in proc sys dev/pts dev run boot; do
+    for a in proc sys dev/pts dev run; do
         umount -l "${CHROOT}/${a}" 2>/dev/null || true
     done
 }
@@ -44,16 +44,14 @@ deb http://deb.debian.org/debian-security/ ${RELEASE}-security main contrib non-
 deb http://deb.debian.org/debian ${RELEASE}-updates main contrib non-free-firmware
 EOF
 
-# 5. 挂载宿主机虚拟文件系统（安装内核生成 initramfs 必须依赖 proc/sys/dev）
-mkdir -p "${CHROOT}/boot"
+# 5. 挂载宿主机虚拟文件系统（不要挂载 tmpfs 到 boot）
 mount -t proc proc "${CHROOT}/proc/"
 mount -t sysfs sys "${CHROOT}/sys/"
-mount -t tmpfs tmpfs "${CHROOT}/boot/"
 mount -o bind /dev/ "${CHROOT}/dev/"
 mount -o bind /dev/pts/ "${CHROOT}/dev/pts/"
 mount -o bind /run "${CHROOT}/run/"
 
-# 6. 执行内部 setup 脚本（在此步骤自动安装原生内核与 u-boot-menu）
+# 6. 执行内部 setup 脚本
 cp scripts/setup.sh "${CHROOT}"
 chroot "${CHROOT}" ${CHROOT_PREFIX} /bin/sh -c /setup.sh
 
@@ -86,8 +84,8 @@ EOF
 mkdir -p "${CHROOT}/lib/firmware/msm-firmware-loader"
 printf "PARTUUID=80780b1d-0fe1-27d3-23e4-9244e62f8c46\t/boot\text4\tdefaults,noatime\t0 2\n" > "${CHROOT}/etc/fstab"
 
-# 13. 打包前清理静态 QEMU 文件（如果存在）
+# 13. 打包前清理静态 QEMU 文件
 rm -f "${CHROOT}/usr/bin/qemu-aarch64-static"
 
-# 14. 打包 rootfs
+# 14. 打包 rootfs（此时 /boot 完整包含了所有内核与配置文件）
 tar cpzf rootfs.tgz -C rootfs .
