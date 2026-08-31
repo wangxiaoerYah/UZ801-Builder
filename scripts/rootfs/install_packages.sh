@@ -7,6 +7,15 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 . "${HERE}/../lib/common.sh"
 
 log "Installing postmarketOS base packages (${INPUT_RELEASE})..."
+
+# 宿主侧: 复制自定义 APK (build-packages 产物, 如 adbd) 到 chroot /tmp
+# 注意: CUSTOM_APK_DIR 是宿主路径, chroot 内不可见, 必须先复制
+if [ -n "${CUSTOM_APK_DIR:-}" ] && [ -d "$CUSTOM_APK_DIR" ] && ls "$CUSTOM_APK_DIR"/*.apk >/dev/null 2>&1; then
+    log "Installing custom APKs from \${CUSTOM_APK_DIR}..."
+    mkdir -p "${CHROOT}/tmp"
+    cp "$CUSTOM_APK_DIR"/*.apk "${CHROOT}/tmp/"
+fi
+
 chroot "${CHROOT}" /bin/sh -c "
   # merge-usr 必须先于 apk add: pmOS initramfs 文件列表要求 /usr/sbin/xxx 路径,
   # 而内核包安装时 mkinitfs trigger 立即运行, 晚了会因缺 /usr/sbin/losetup 失败
@@ -77,9 +86,8 @@ EOF
   # pmOS 默认 SSH = openssh-server-pam (postmarketos-base-ssh 依赖), sshd.pam 同样需要 keys
   [ -e /etc/ssh/ssh_host_ed25519_key ] || ssh-keygen -A
 
-  # 安装自定义 APK (workflow build-packages 产物, 如 adbd)
-  if [ -n "\${CUSTOM_APK_DIR:-}" ] && [ -d "\$CUSTOM_APK_DIR" ] && ls "\$CUSTOM_APK_DIR"/*.apk >/dev/null 2>&1; then
-    cp "\$CUSTOM_APK_DIR"/*.apk /tmp/
+  # 安装自定义 APK (由宿主侧复制到 /tmp, 如 adbd)
+  if ls /tmp/*.apk >/dev/null 2>&1; then
     apk add --no-cache --allow-untrusted /tmp/*.apk
     rm -f /tmp/*.apk
   fi
