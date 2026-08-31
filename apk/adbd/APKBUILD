@@ -1,0 +1,41 @@
+# Maintainer: wangxiaoerYah <openstick-builder@users.noreply.github.com>
+pkgname=adbd
+pkgver=1.0.0
+pkgrel=0
+pkgdesc="Android Debug Bridge daemon for Linux (UZ801 OpenStick)"
+url="https://github.com/wangxiaoerYah/adbd-linux"
+arch="aarch64"
+license="Apache-2.0"
+depends="openssl libcap"
+makedepends="openssl-dev libcap-dev linux-headers glib-dev"
+options="!check"
+source="adbd-linux.tar.gz
+	adbd.initd
+	adbd.confd"
+
+builddir="$srcdir/adbd-linux"
+
+build() {
+	cd "$builddir"
+	# 确保无残留 (防止宿主 glibc 产物混入, 导致 musl 环境链接错误)
+	make clean >/dev/null 2>&1 || true
+	# openssl 3.x 兼容修复已包含在源码; 抑制弃用警告
+	# AR/RANLIB 必须显式指定 (Makefile 的 ${RANLIB} 未定义会出错)
+	make CC=cc CXX=c++ AR=ar RANLIB=ranlib \
+		LFLAGS="-Wno-deprecated-declarations -D_GNU_SOURCE -std=gnu++14" \
+		LDFLAGS="-lcap"
+}
+
+package() {
+	cd "$builddir"
+	install -Dm755 adb/adbd "$pkgdir"/usr/bin/adbd
+	install -Dm644 "$srcdir"/adbd.initd "$pkgdir"/etc/init.d/adbd
+	install -Dm644 "$srcdir"/adbd.confd "$pkgdir"/etc/conf.d/adbd
+}
+
+sha512sums="
+d9a7ad230c3f5c70635098b58677f53b3c5c504d609cf4b7e7e5013bc250476a8f8e8d630f62a1a331f67247ff44926945318e05db579f8bd3e2c4011a8bd615  adbd-linux.tar.gz
+14e0c7fb3588a8f8dc82787796e3857677fdf6ffd7a60bd1bd2bcb883214050bc87a701360f5eb02a5bd041065730e32bd483245dff57262ac5ecf9644743a9f  adbd.initd
+c127b2199674390690889928fc2377a1fd6d8b9fea5d6dc5b3a8ad35fe5b63e77d0c6a8c3dac31d8b347420a10c86156161102dca95af30e8a2068772b26608b  adbd.confd
+
+"

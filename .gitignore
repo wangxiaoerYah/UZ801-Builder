@@ -13,3 +13,4 @@ dist
 !firmware/**
 !scripts/**
 
+apk/adbd/adbd-linux.tar.gz
