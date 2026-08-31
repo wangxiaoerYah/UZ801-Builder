@@ -13,7 +13,7 @@ rm -rf "${CHROOT}" "${BOOT_IMG}" "${ROOT_IMG}"
 mkdir -p "${CHROOT}" files
 
 # 挂载失败时清理
-trap 'umount -l "${CHROOT}/var/lib" 2>/dev/null || true; umount -l "${CHROOT}/boot" 2>/dev/null || true; umount -l "${CHROOT}" 2>/dev/null || true' EXIT INT TERM
+trap 'umount -l "${CHROOT}/proc" 2>/dev/null || true; umount -l "${CHROOT}/sys" 2>/dev/null || true; umount -l "${CHROOT}/dev" 2>/dev/null || true; umount -l "${CHROOT}/var/lib" 2>/dev/null || true; umount -l "${CHROOT}/boot" 2>/dev/null || true; umount -l "${CHROOT}" 2>/dev/null || true' EXIT INT TERM
 
 log "Creating image files..."
 truncate -s "${BOOT_SIZE}" "${BOOT_IMG}"
@@ -37,6 +37,12 @@ mount -o loop,subvol=@ "${ROOT_IMG}" "${CHROOT}"
 mkdir -p "${CHROOT}/boot" "${CHROOT}/var/lib"
 mount -o loop "${BOOT_IMG}" "${CHROOT}/boot"
 mount -o loop,subvol=@var_lib "${ROOT_IMG}" "${CHROOT}/var/lib"
+
+# 挂载虚拟文件系统: chroot 内 mkinitfs/boot-deploy 的 df 空间检查依赖 /proc /sys
+mkdir -p "${CHROOT}/proc" "${CHROOT}/sys" "${CHROOT}/dev"
+mount -t proc proc "${CHROOT}/proc" 2>/dev/null || true
+mount -t sysfs sys "${CHROOT}/sys" 2>/dev/null || true
+mount -o bind /dev "${CHROOT}/dev" 2>/dev/null || true
 
 trap - EXIT INT TERM
 log "Mounted: ${CHROOT} (@), ${CHROOT}/boot, ${CHROOT}/var/lib (@var_lib)"
