@@ -54,6 +54,8 @@ U_BOOT_FDT="qcom/msm8916-yiming-uz801v3.dtb"
 U_BOOT_FDT_DIR="/dtbs/"
 EOF
 
+mkdir -p /boot/dtbs
+
 KERNEL_VER=$(ls /lib/modules | head -n 1)
 if [ -d "/usr/lib/linux-image-${KERNEL_VER}/qcom" ]; then
     cp -r "/usr/lib/linux-image-${KERNEL_VER}/qcom/"* /boot/dtbs/
