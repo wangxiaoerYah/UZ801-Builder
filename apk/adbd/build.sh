@@ -1,44 +1,35 @@
 #!/bin/sh
-# 构建 adbd apk (可复现):
-#   1. submodule 更新 (src/adbd-linux = tonyho 原版)
-#   2. 更新 APKBUILD sha512sums (patch/initd/confd)
-#   3. Alpine 容器 (aarch64) 执行 abuild
+# 在 Alpine 容器内构建本包 (workflow / 本地 docker 均调用)
+# 用法: docker run -v <包目录>:/pkg -v <repo>/src:/src alpine:3.24 sh -c 'sh /pkg/build.sh'
+# 模块化: 新包 = 目录 + APKBUILD + 本脚本 (workflow 无需修改)
 set -e
-HERE="$(cd "$(dirname "$0")" && pwd)"
-REPO="$(cd "$HERE/../.." && pwd)"
-cd "$HERE"
+cd /pkg
 
-echo "=== 1. submodule 更新 ==="
-git -C "$REPO" submodule update --init --recursive 2>/dev/null || true
-test -d "$REPO/src/adbd-linux" || { echo "submodule 缺失"; exit 1; }
+echo "=== 安装构建依赖 ==="
+apk update >/dev/null 2>&1 || true
+apk add --no-cache abuild alpine-sdk sudo >/dev/null 2>&1
+# 解析 APKBUILD 的 makedepends 并安装 (按需, 支持任意新包)
+MAKEDEPS=$(grep '^makedepends=' APKBUILD 2>/dev/null | sed -n 's/makedepends="\(.*\)"/\1/p' | tr ' ' '\n' | grep -v '^$' | paste -sd' ')
+if [ -n "$MAKEDEPS" ]; then
+	apk add --no-cache $MAKEDEPS >/dev/null 2>&1 || { echo "::warning::makedepends 部分安装失败: $MAKEDEPS"; }
+fi
 
-echo "=== 2. 更新 sha512sums ==="
-python3 - << PYEOF
-import re, subprocess
-files = ['adbd-linux-fixes.patch', 'adbd.initd', 'adbd.confd']
-sums = subprocess.run(['sha512sum'] + files, capture_output=True, text=True).stdout.strip().split('\n')
-entries = []
-for line in sums:
-    parts = line.split()
-    entries.append(f"{parts[0]}  {parts[1]}")
-s = open('APKBUILD').read()
-s = re.sub(r'(sha512sums="\n)[^"]*(\n")', lambda m: m.group(1) + '\n'.join(entries) + m.group(2), s)
-open('APKBUILD', 'w').write(s)
-print("sha512sums 已更新")
-PYEOF
+echo "=== 配置 builder ==="
+addgroup -S abuild 2>/dev/null || true
+adduser -D builder 2>/dev/null || true
+adduser builder abuild 2>/dev/null || true
+echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
+su builder -c "abuild-keygen -a -n" >/dev/null 2>&1 || true
+chown -R builder /pkg /src 2>/dev/null || true
 
-echo "=== 3. Alpine 容器构建 (aarch64, 源码=submodule) ==="
-sudo podman run --rm --network host --platform linux/arm64 \
-	-v "$HERE":/work:Z -v "$REPO/src/adbd-linux":/src/adbd-linux:ro,Z alpine:3.24 sh -c '
-apk add --no-cache abuild alpine-sdk openssl-dev libcap-dev linux-headers glib-dev libcap openssl >/dev/null 2>&1
-addgroup -S abuild >/dev/null 2>&1
-adduser -D builder >/dev/null 2>&1
-adduser builder abuild >/dev/null 2>&1
-su builder -c "abuild-keygen -a -n" >/dev/null 2>&1
-chown -R builder /work 2>/dev/null
-# builddir = \$startdir/../../src/adbd-linux = /src/adbd-linux (submodule 挂载)
-su builder -c "cd /work && abuild" 2>&1 | tail -5
-cp /home/builder/packages/aarch64/adbd-1.0.0-r0.apk /work/ 2>/dev/null
-'
-echo "=== 完成 ==="
-ls -la adbd-1.0.0-r0.apk 2>/dev/null
+echo "=== abuild 构建 ==="
+# 依赖已预装, 用 abuild (不带 -r, 避免 setuid/apk 索引问题)
+su builder -c "cd /pkg && abuild" 2>&1 | tail -8 || { echo "::error::abuild 失败"; exit 1; }
+
+echo "=== 导出 apk ==="
+find /home/builder/packages -name "*.apk" -exec cp {} /pkg/ \; 2>/dev/null || true
+if [ -z "$(ls /pkg/*.apk 2>/dev/null)" ]; then
+	echo "::error::未生成 apk"
+	exit 1
+fi
+ls -la /pkg/*.apk

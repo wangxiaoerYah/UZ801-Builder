@@ -37,19 +37,8 @@ jobs:
             docker run --rm \
               -v "$PWD/$d":/pkg:Z \
               -v "$PWD/src":/src:ro,Z \
-              alpine:3.24 sh -c '
-                apk add --no-cache abuild alpine-sdk sudo >/dev/null 2>&1
-                addgroup -S abuild >/dev/null 2>&1
-                adduser -D builder >/dev/null 2>&1
-                adduser builder abuild >/dev/null 2>&1
-                su builder -c "abuild-keygen -a -n" >/dev/null 2>&1
-                chown -R builder /pkg /src 2>/dev/null
-                # APKBUILD 的 makedepends 由 abuild 通过 sudo 安装
-                echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
-                su builder -c "cd /pkg && abuild -r" 2>&1 | tail -6 || exit 1
-                # 收集 apk (在容器内, 包目录权限对宿主导出)
-                find /home/builder/packages -name "*.apk" -exec cp {} /pkg/ \; 2>/dev/null
-              ' || { echo "::error::$name 构建失败"; failed=1; continue; }
+              alpine:3.24 sh -c 'sh /pkg/build.sh' \
+            || { echo "::error::$name 构建失败"; failed=1; continue; }
             # 导出 apk 到 artifacts (排除 submodule 等)
             cp "$d"/*.apk artifacts/ 2>/dev/null || true
             # 清理包目录 (避免污染 git 工作区)
