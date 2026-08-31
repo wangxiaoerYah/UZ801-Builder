@@ -82,6 +82,26 @@ chroot "${CHROOT}" /bin/sh -c '
   rc-update del swapfile 2>/dev/null || true
 '
 
+# ---- podman 容器配置 (服务器场景) ----
+# 无根 (rootless) 子 uid/gid 映射
+cat > "${CHROOT}/etc/subuid" <<'EOF'
+user:100000:65536
+EOF
+cat > "${CHROOT}/etc/subgid" <<'EOF'
+user:100000:65536
+EOF
+# 容器默认配置: crun 运行时 (默认), 日志限制, cgroupfs (openrc 无 systemd)
+mkdir -p "${CHROOT}/etc/containers"
+cat > "${CHROOT}/etc/containers/containers.conf" <<'EOF'
+[containers]
+log_size_max = 10485760
+[engine]
+cgroup_manager = "cgroupfs"
+events_logger = "file"
+EOF
+# 内核模块预加载 (overlay 存储 + veth 网络)
+printf 'overlay\nveth\n' > "${CHROOT}/etc/modules-load.d/containers.conf"
+
 # ---- WiFi: 关闭省电 (服务器场景, USB 供电, 无功耗顾虑) ----
 # wcn36xx + iwd 省电模式下帧级延迟高 (实测局域网 ping 15.6ms -> 4.8ms,
 # 下载 1.3 -> 2.3 Mbps)。服务器场景必须关闭。

@@ -53,6 +53,12 @@ EOF
       # 保留以支持传统 iptables 命令语法, 实际规则走 nft
       iptables \
       nftables \
+      # podman 容器 (服务器场景; 无根需 slirp4netns/fuse-overlayfs/shadow-uidmap)
+      podman \
+      podman-docker \
+      slirp4netns \
+      fuse-overlayfs \
+      shadow-uidmap \
       shadow \
       bash \
       chrony \
