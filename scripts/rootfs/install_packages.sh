@@ -58,11 +58,8 @@ EOF
       libqmi \
       libqmi-bash-completion \
       iperf3 \
-      # Alpine 的 iptables 即 iptables-nft (nftables 后端兼容层),
-      # 保留以支持传统 iptables 命令语法, 实际规则走 nft
       iptables \
       nftables \
-      # podman 容器 (服务器场景; 无根需 slirp4netns/fuse-overlayfs/shadow-uidmap)
       podman \
       podman-docker \
       slirp4netns \
