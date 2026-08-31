@@ -42,6 +42,19 @@ chroot "${CHROOT}" /bin/sh -c '
 echo 'user ALL=(ALL:ALL) NOPASSWD: ALL' > "${CHROOT}/etc/sudoers.d/user"
 chmod 0440 "${CHROOT}/etc/sudoers.d/user"
 
+# ---- USB 网络: 清理 initramfs 残留的 unudhcpd ----
+# initramfs 用 unudhcpd 提供早期 USB 网络 (usb0=172.16.42.1, 电脑=172.16.42.2),
+# switch_root 不终止它, 残留进程与 NM shared 的 dnsmasq DHCP 冲突
+# (电脑可能拿到 172.16.42.2 但网关 172.16.42.1 已被 NM 覆盖 -> 网络不通)
+# local 服务 (字母序在 networkmanager 前) 启动时杀掉, 让 NM 独占 usb0
+mkdir -p "${CHROOT}/etc/local.d"
+cat > "${CHROOT}/etc/local.d/usb-net.start" <<'EOF'
+#!/bin/sh
+# NM 接管 usb0 前清理 initramfs 残留的 unudhcpd (DHCP 冲突源)
+pkill -x unudhcpd 2>/dev/null || true
+EOF
+chmod +x "${CHROOT}/etc/local.d/usb-net.start"
+
 # ---- OpenRC 服务 ----
 chroot "${CHROOT}" /bin/sh -c '
   rc-update add devfs sysinit
@@ -62,6 +75,9 @@ chroot "${CHROOT}" /bin/sh -c '
   # post-install 可能因 "swap 虚拟服务冲突" 警告而失败, 这里幂等补上
   rc-update add swclock-offset-boot boot 2>/dev/null || true
   rc-update add swclock-offset-shutdown shutdown 2>/dev/null || true
+  # SSH (user 用户密码登录; host keys 由 install_packages.sh 生成)
+  rc-update add sshd default
+  rc-update add local default
 '
 
 # ---- 时区 (默认上海) ----
