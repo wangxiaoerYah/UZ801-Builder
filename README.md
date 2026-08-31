@@ -23,9 +23,9 @@ cd UZ801-Builder
 # 一键构建 (默认 yiming-uz801v3)
 sudo ./build.sh
 
-# 指定板子 / 版本 (参数需经 sudo env 传递; 默认 RELEASE_INPUT=v26.06)
+# 指定板子 (参数需经 sudo env 传递; 默认 RELEASE_INPUT=v26.06)
 sudo env BOARD=thwc-uf896 ./build.sh
-sudo env BOARD=yiming-uz801v3 RELEASE_INPUT=v25.12 ./build.sh
+sudo env BOARD=yiming-uz801v3 ./build.sh
 ```
 
 产物位于 `files/`:

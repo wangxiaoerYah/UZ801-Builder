@@ -59,8 +59,7 @@ scripts/
 
 | RELEASE_INPUT | Alpine 基础 | 设备包名 | 说明 |
 | ------------- | ----------- | -------- | ---- |
-| **v26.06** (默认) | v3.24 | `device-zhihe-generic` | 内核 6.12.1-r5; rmtfs 由 Alpine v3.24 提供 |
-| v25.12 | v3.23 | `device-generic-zhihe` | 旧版 |
+| **v26.06** (仅支持) | v3.24 | `device-zhihe-generic` | 内核 6.12.1-r5; rmtfs 由 Alpine v3.24 提供 |
 
 > 默认构建已全面切到 v26.06 (已验证全部依赖闭环: pmOS 仓库 + Alpine v3.24 main/community)。
 
