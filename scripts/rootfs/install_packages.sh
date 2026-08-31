@@ -64,7 +64,7 @@ EOF
       chrony \
       curl \
       wget \
-      nano \
+      neovim \
       htop \
       vnstat \
       util-linux \

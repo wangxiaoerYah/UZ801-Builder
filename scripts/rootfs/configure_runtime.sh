@@ -138,6 +138,22 @@ cat > "${CHROOT}/etc/chrony/sources.d/aliyun.sources" <<'EOF'
 server ntp.aliyun.com iburst
 EOF
 
+# ---- 编辑器: neovim 为全局默认 (替代 nano) ----
+# /usr/bin/editor 链接 + EDITOR/VISUAL 环境变量 + vi/vim alias
+ln -sf /usr/bin/nvim "${CHROOT}/usr/bin/editor"
+cat > "${CHROOT}/etc/profile.d/editor.sh" <<'EOF'
+export EDITOR=nvim
+export VISUAL=nvim
+alias vi=nvim
+alias vim=nvim
+EOF
+# bash 非交互也生效 (sudo 等场景)
+cat > "${CHROOT}/etc/bash.bashrc" <<'EOF'
+if [ -f /etc/profile.d/editor.sh ]; then
+    . /etc/profile.d/editor.sh
+fi
+EOF
+
 # ---- 时区 (默认上海) ----
 ln -sf /usr/share/zoneinfo/Asia/Shanghai "${CHROOT}/etc/localtime"
 echo "Asia/Shanghai" > "${CHROOT}/etc/timezone"
